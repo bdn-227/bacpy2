@@ -67,7 +67,7 @@ def parse_dataset_evoware(layout, mapping=None, n_jobs=-1, manifest_file="parsin
     # get lists for dataprocessing
     chunked_file_list = list(chunk_list(file_list, files_per_plate))
     sample_list = list(layout_tab["sampleID"])
-    parsing_manifest = pl.DataFrame({"sampleID": sample_list, "files_used": chunked_file_list})
+    parsing_manifest = pl.DataFrame({"sampleID": sample_list, "files_used": chunked_file_list}).explode("files_used")
 
     # using parallel processing to read the files
     with get_context("spawn").Pool(processes=n_jobs) as pool:
