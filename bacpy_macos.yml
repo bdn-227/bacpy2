@@ -35,4 +35,3 @@ dependencies:
       - tzdata==2024.2
       - xlsx2csv==0.8.3
       - xlsxwriter==3.2.0
-prefix: /home/niklas/miniconda3/envs/bacpy_new

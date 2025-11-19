@@ -12,7 +12,7 @@ from bacpy.file_parser_evoware import read_metadata, chunk_list, parse_batch
 
 
 # now building the wrapper function to parse a whole evoware dataset
-def parse_dataset_evoware(layout, mapping=None, n_jobs=-1):
+def parse_dataset_evoware(layout, mapping=None, n_jobs=-1, manifest_file="parsing_manitest"):
     """
     function to parse a TECAN evoware dataset to obtain a neatly formatted dataframe (long format)
     layout:     str     REQUIRED: path to the layout file:  **plates  <-->  hotel**
@@ -67,6 +67,7 @@ def parse_dataset_evoware(layout, mapping=None, n_jobs=-1):
     # get lists for dataprocessing
     chunked_file_list = list(chunk_list(file_list, files_per_plate))
     sample_list = list(layout_tab["sampleID"])
+    parsing_manifest = pl.DataFrame({"sampleID": sample_list, "files_used": chunked_file_list})
 
     # using parallel processing to read the files
     with get_context("spawn").Pool(processes=n_jobs) as pool:
@@ -85,5 +86,5 @@ def parse_dataset_evoware(layout, mapping=None, n_jobs=-1):
         parsed = parsed.join(mapping_tab, how="left", on=intersect1d(parsed.columns, mapping_tab.columns), validate="m:1")
     else:
         parsed = parsed.with_columns(pl.lit("unknown").alias("strainID"))
-
+    parsing_manifest.write_csv(manifest_file + ".tsv", separator="\t")
     return parsed
