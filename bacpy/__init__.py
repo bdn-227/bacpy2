@@ -25,7 +25,7 @@ from .dataset_parser_flowjo import parse_dataset_flowjo
 from .taxonomy import taxonomy_dict, taxonomy_df
 
 # train a model
-from .predictive_model import randomForest, extraTrees, train_test_split, xgboost, neuralnet, svm_classifier
+from .predictive_model import classifier_randomForest, classifier_extraTrees, train_test_split, classifier_xgboost, classifier_neuralnet, classifier_svm, classifier_catboost, classifier_lightgbm
 
 # misc
 from .utils import abs_path, load_model, save_model

@@ -14,6 +14,8 @@ import warnings
 import pickle
 from sklearn.preprocessing import LabelEncoder
 from sklearn.multioutput import MultiOutputClassifier
+from lightgbm import LGBMClassifier
+from catboost import CatBoostClassifier
 
 # load bacpy modules
 from bacpy.taxonomy import taxonomy_dict
@@ -63,7 +65,7 @@ class BaseClassifier(ABC):
             train_y = pl.DataFrame({label: dat for label, dat in zip(self.labels, train_x_ls)})
 
         # train the model
-        self.fit(train_x, train_y)
+        self.fit(train_x.to_numpy(), train_y.to_pandas())
         if shape == 1:
             self.taxonomic_classes = {level: class_ for level, class_ in zip(self.labels, [self.classes_])}
         else:
@@ -89,11 +91,16 @@ class BaseClassifier(ABC):
         test_x      = test_set.select(self.features)
         metadata    = test_set.select(pl.exclude(self.features)).select(pl.exclude(self.labels))
 
-        # vanilla predictions
-        pred = self.predict(test_x)
-        pred_df = pl.DataFrame(pred)
-        pred_df.columns = self.labels
+        if "catboost" in self.model_type:
+            pred_d = {label: pred.ravel() for label, pred in zip(self.labels, [est.predict(test_x.to_numpy()) for est in self.estimators_])}
+            pred_df = pl.DataFrame(pred_d)
+
+        else:
+            pred = self.predict(test_x.to_pandas())
+            pred_df = pl.DataFrame(pred)
+            pred_df.columns = self.labels
         
+        # convert cats
         if "xgboost" in self.model_type:
             for label in self.labels:
                 transformed = self.le[label].inverse_transform(pred_df[label])
@@ -300,7 +307,7 @@ class BaseClassifier(ABC):
 
 
 
-class randomForest(RandomForestClassifier, BaseClassifier):
+class classifier_randomForest(RandomForestClassifier, BaseClassifier):
     def __init__(self, 
                  n_jobs = 1, 
                  n_estimators = 500,
@@ -323,7 +330,7 @@ class randomForest(RandomForestClassifier, BaseClassifier):
 
 
 
-class extraTrees(ExtraTreesClassifier, BaseClassifier):
+class classifier_extraTrees(ExtraTreesClassifier, BaseClassifier):
     def __init__(self, 
                  n_jobs = 1, 
                  n_estimators = 500,
@@ -347,7 +354,7 @@ class extraTrees(ExtraTreesClassifier, BaseClassifier):
 
 
 
-class svm_classifier(MultiOutputClassifier, BaseClassifier):
+class classifier_svm(MultiOutputClassifier, BaseClassifier):
     def __init__(self, 
                  n_jobs = 1,
                  kernel = "rbf",
@@ -369,7 +376,7 @@ class svm_classifier(MultiOutputClassifier, BaseClassifier):
                          n_jobs=self.n_jobs)
 
 
-class xgboost(MultiOutputClassifier, BaseClassifier):
+class classifier_xgboost(MultiOutputClassifier, BaseClassifier):
     def __init__(self, 
                  n_jobs = 1,
                  max_depth = None,
@@ -405,36 +412,61 @@ class xgboost(MultiOutputClassifier, BaseClassifier):
                          n_jobs=self.n_jobs)
 
 
-class __xgboost(XGBClassifier, BaseClassifier):
+class classifier_catboost(MultiOutputClassifier, BaseClassifier):
     def __init__(self, 
-                 n_jobs = 1,
-                 max_depth = None,
-                 min_child_weight = None,
-                 subsample = None,
-                 colsample_bytree = None,
-                 gamma = None,
-                 reg_lambda = None,
-                 reg_alpha = None,
+                 iterations = None,
                  learning_rate = None,
-                 n_estimators = 100,
+                 early_stopping_rounds = None,
+                 n_jobs=1,
+                 **kwargs
                  ):
-        
-        # init the randomForest Class
-        super().__init__(n_estimators=n_estimators, 
-                         n_jobs=n_jobs, 
-                         max_depth=max_depth, 
-                         min_child_weight=min_child_weight,
-                         subsample=subsample,
-                         colsample_bytree=colsample_bytree,
-                         gamma=gamma,
-                         reg_lambda=reg_lambda,
-                         reg_alpha=reg_alpha,
-                         learning_rate=learning_rate,
-                        )
-        self.model_type = "xgboost"
+        self.iterations = iterations
+        self.learning_rate = learning_rate
+        self.early_stopping_rounds = early_stopping_rounds
+        self.n_jobs = n_jobs
+        self.allow_writing_files = False
+        self.save_snapshot = False
+        self.model_type = "multi_catboost"
+        super().__init__(estimator=CatBoostClassifier(iterations=iterations,
+                                                      learning_rate=learning_rate,
+                                                      early_stopping_rounds=early_stopping_rounds,
+                                                      thread_count=n_jobs,
+                                                      allow_writing_files=False,
+                                                      save_snapshot=False,
+                                                      **kwargs
+                                                      ),
+                         n_jobs=1)
 
 
-class neuralnet(MLPClassifier, BaseClassifier):
+class classifier_lightgbm(MultiOutputClassifier, BaseClassifier):
+    def __init__(self,
+                 num_leaves=31,
+                 n_estimators=100,
+                 max_depth=-1,
+                 boosting_type = "gbdt",
+                 learning_rate=0.1,
+                 n_jobs=None,
+                 **kwargs
+                 ):
+        self.n_estimators = n_estimators
+        self.boosting_type = boosting_type
+        self.learning_rate = learning_rate
+        self.num_leaves = num_leaves
+        self.max_depth = max_depth
+        self.n_jobs = n_jobs
+        self.model_type = "multi_lightbgm"
+        super().__init__(estimator=LGBMClassifier(n_estimators=n_estimators,
+                                                  num_leaves=num_leaves,
+                                                  max_depth=max_depth,
+                                                  boosting_type=boosting_type,
+                                                  learning_rate = learning_rate,
+                                                  n_jobs = n_jobs,
+                                                  **kwargs
+                                                  ),
+                         n_jobs=1)
+
+
+class classifier_neuralnet(MLPClassifier, BaseClassifier):
     def __init__(self,
                  hidden_layer_sizes=(100,),
                  activation = "relu",
@@ -444,8 +476,7 @@ class neuralnet(MLPClassifier, BaseClassifier):
                  max_iter=200,
                  early_stopping=True,
                  ):
-        
-        # init the randomForest Class
+        self.model_type = "neural_net"
         super().__init__(
                          hidden_layer_sizes=hidden_layer_sizes,
                          activation=activation,
@@ -455,7 +486,6 @@ class neuralnet(MLPClassifier, BaseClassifier):
                          max_iter=max_iter,
                          early_stopping=early_stopping,
                          )
-        self.model_type = "neural_net"
 
 
 

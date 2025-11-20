@@ -1,6 +1,6 @@
 
 # load imports
-from bacpy.predictive_model import randomForest, train_test_split
+from bacpy.predictive_model import classifier_randomForest, train_test_split
 from bacpy.preprocess_tecan import preprocess_platereader
 from bacpy.plotting import plot_confusion_matrix
 from scipy.stats import hmean
@@ -116,7 +116,7 @@ def predictReisolation(
                        mapping=False, 
                        filename=False, 
                        return_metrics=False, 
-                       model=randomForest(), 
+                       model=classifier_randomForest(), 
                        gaussian=False,
                        metricsPlot = False,
                        probability=None,
