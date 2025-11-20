@@ -95,7 +95,9 @@ class BaseClassifier(ABC):
         pred_df.columns = self.labels
         
         if "xgboost" in self.model_type:
-            pred_df = pred_df.with_columns(pl.col(label).map_batches(lambda x: self.le[label].inverse_transform(x)) for label in self.labels)
+            for label in self.labels:
+                transformed = self.le[label].inverse_transform(pred_df[label])
+                pred_df = pred_df.drop(label).with_columns(pl.Series(name=label, values=transformed))
 
         return pl.concat([metadata, pred_df], how="horizontal")
 
