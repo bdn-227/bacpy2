@@ -13,6 +13,7 @@ from itertools import product
 import warnings
 import pickle
 from sklearn.preprocessing import LabelEncoder
+from sklearn.multioutput import MultiOutputClassifier
 
 # load bacpy modules
 from bacpy.taxonomy import taxonomy_dict
@@ -52,10 +53,14 @@ class BaseClassifier(ABC):
             train_y = train_y.to_numpy().reshape(-1)
 
         # perform label encoding of model is xgboost
-        if self.model_type == "xgboost":
-            self.le = LabelEncoder()
-            self.le.fit(train_y)
-            train_y = self.le.transform(train_y)
+        if "xgboost" in self.model_type:
+            train_x_ls = []
+            self.le = {}
+            for label in self.labels:
+                self.le[label] = LabelEncoder()
+                self.le[label].fit(train_y[label])
+                train_x_ls.append(self.le[label].transform(train_y[label]))
+            train_y = pl.DataFrame({label: dat for label, dat in zip(self.labels, train_x_ls)})
 
         # train the model
         self.fit(train_x, train_y)
@@ -66,10 +71,7 @@ class BaseClassifier(ABC):
 
 
     def predict_strains(self, 
-                        test_set, 
-                        probability=False,
-                        predict_all_ranks=False,
-                        penalty=2):
+                        test_set):
         """
         function to predict the taxonomy of bacterial spectra
         test_set            pl.DataFrame    a dataframe containing feautres (generated with bacpy.preprocess_data)
@@ -87,101 +89,21 @@ class BaseClassifier(ABC):
         test_x      = test_set.select(self.features)
         metadata    = test_set.select(pl.exclude(self.features)).select(pl.exclude(self.labels))
 
-        # predictions based on propability
-        if probability and len(self.labels) > 1:
-            pred_df = self._ppredict(test_x, predict_all_ranks, penalty)
-
         # vanilla predictions
-        else:
-            pred = self.predict(test_x)
-            pred_df = pl.DataFrame(pred)
-            pred_df.columns = self.labels
+        pred = self.predict(test_x)
+        pred_df = pl.DataFrame(pred)
+        pred_df.columns = self.labels
         
-        # covert predictions for xgboost back to strings
-        if self.model_type == "xgboost":
-            transformed = self.le.inverse_transform(pred)
-            pred_df = pl.DataFrame(transformed)
-            pred_df.columns = self.labels
+        if "xgboost" in self.model_type:
+            pred_df = pred_df.with_columns(pl.col(label).map_batches(lambda x: self.le[label].inverse_transform(x)) for label in self.labels)
 
         return pl.concat([metadata, pred_df], how="horizontal")
-
-
-    def _ppredict(self, test_x, predict_all_ranks, penalty):
-
-        # prediction
-        probabilities = self.predict_proba(test_x)
-
-        # formatting of data
-        probability_df = pl.concat([pl.DataFrame(prob).rename({f"column_{i}": f"{label_}_{c}" for i, c in enumerate(class_)}) for prob, class_, label_ in zip(probabilities, self.classes_, self.labels)], how="horizontal")
-
-        # this is the scoring function, we might want to use this one to 
-        # normalize the scores later on by calculating a "max-score"
-        #scorer = lambda row: np.prod(row) * (len(row)**penalty)
-        scorer = lambda row: np.prod(row) * (np.exp(len(row)))
-
-        # now, iterate through the dict, and determine the best score for 
-        # each taxonomic prediction
-        tax_levels_to_test = [self.labels[-1]] if predict_all_ranks else self.labels
-        classes_ls = []
-        scores_list = []
-        max_scores = []
-        for key in tax_levels_to_test:
-
-            # go through the levels in the taxonomy dict and account
-            # only for possible scenarios
-            taxonomy_combinations = taxonomy_dict[key].to_numpy()
-
-            # now test each scenario against the whole prediction corpus
-            score_ls = []
-            for combination in taxonomy_combinations:
-                
-                try:
-                    # subset the columns of that taxonomic combination and calculate a score
-                    max_scores.append(scorer(np.full(len(combination), 1)))
-                    score = probability_df.select(combination).map_rows(scorer).rename({"map": "-".join(combination)})
-                    score_ls.append(score)
-
-                except:
-                    pass
-                    #print(f"combination not present: {combination}")
-            
-            # concat the data together and get the score for that respective tax-rank
-            scores_df = pl.concat(score_ls, how="horizontal")
-            classes = np.array(scores_df.columns)
-            predicted_class = classes[scores_df.to_numpy().argmax(axis=1)]
-            prediced_score  = scores_df.to_numpy().max(axis=1)
-            classes_ls.append(predicted_class)
-            scores_list.append(prediced_score)
-
-
-        # now get the final predictions based on the aggregated scores
-        classes = np.array(classes_ls).T
-        indices = np.array(scores_list).argmax(axis=0)
-        final_score = np.array(scores_list).max(axis=0)
-        final_pred = classes[np.arange(classes.shape[0]), indices]
-
-        # reformat the strings determining the prediction class
-        result_list = []
-        for result in final_pred:
-            result_list.append(pl.DataFrame({elem.split("_")[0]: elem.split("_")[1] for elem in result.split("-")}))
-        
-        # put the data together and return 
-        predictions = (pl.concat(result_list, how="diagonal_relaxed")
-                        .with_columns(pl.Series(final_score).alias("prediction_score"))
-                        .with_columns((pl.col("prediction_score") / np.max(max_scores)).alias("normalized_score"))
-                        
-                    )
-        
-        return predictions
 
 
 
     def evaluate(self, 
                  validation_set, 
-                 probability=False,
-                 predict_all_ranks=False,
                  metric="cm", # cm | stats | both
-                 penalty=2,
                  average="weighted",
                  ):
         """
@@ -198,10 +120,7 @@ class BaseClassifier(ABC):
         truth = validation_set.select(self.labels)
 
         # perform the predictions
-        pred = self.predict_strains(validation_x, 
-                                    probability=probability, 
-                                    predict_all_ranks=predict_all_ranks, 
-                                    penalty=penalty)
+        pred = self.predict_strains(validation_x)
         
 
         # nulls in predictions probably need to be replaced
@@ -229,8 +148,8 @@ class BaseClassifier(ABC):
             labels = self.taxonomic_classes[label]
 
             # convert for xgboost
-            if self.model_type == "xgboost":
-                labels = self.le.inverse_transform(labels)
+            if "xgboost" in self.model_type:
+                labels = self.le[label].inverse_transform(labels)
 
             # get the calsses used for predictions
             with warnings.catch_warnings():
@@ -277,6 +196,9 @@ class BaseClassifier(ABC):
         function to retrieve the feature importances of the model
         as_matrix  bool    default: False; return feature importances as matrix instead of table
         """
+
+        if self.model_type == "multi_svc":
+            ValueError(f"MULTI-OUTPUT SVM DOES NOT ALLOW FOR DETERMINATION OF FEATURE IMPORTANCES..")
 
         # extract the information
         importances = self.feature_importances_
@@ -387,8 +309,6 @@ class randomForest(RandomForestClassifier, BaseClassifier):
                  min_samples_leaf = 1,
                  bootstrap = True
                  ):
-
-        # init the randomForest Class
         super().__init__(n_estimators=n_estimators, 
                          n_jobs=n_jobs, 
                          criterion=criterion,
@@ -412,8 +332,6 @@ class extraTrees(ExtraTreesClassifier, BaseClassifier):
                  min_samples_leaf = 1,
                  bootstrap = True,
                  ):
-        
-        # init the randomForest Class
         super().__init__(n_estimators=n_estimators, 
                          n_jobs=n_jobs, 
                          max_features=max_features, 
@@ -426,23 +344,66 @@ class extraTrees(ExtraTreesClassifier, BaseClassifier):
         self.model_type = "tree"
 
 
-class svm(SVC, BaseClassifier):
+
+class svm_classifier(MultiOutputClassifier, BaseClassifier):
     def __init__(self, 
+                 n_jobs = 1,
                  kernel = "rbf",
-                 C = 1.0,
+                 C = 1,
                  gamma = "scale",
                  class_weight = None,
                  ):
-        
-        # init the randomForest Class
-        super().__init__(kernel=kernel, 
-                         C = C, 
-                         gamma=gamma,
-                         class_weight=class_weight)
-        self.model_type = "svm"
+        self.n_jobs = n_jobs
+        self.kernel = kernel
+        self.C = C
+        self.gamma = gamma
+        self.class_weight = class_weight
+        self.model_type = "multi_svm"
+        super().__init__(estimator=SVC(kernel=self.kernel,
+                                       C=self.C,
+                                       gamma=self.gamma,
+                                       class_weight=self.class_weight,
+                                       probability=True),
+                         n_jobs=self.n_jobs)
 
 
-class xgboost(XGBClassifier, BaseClassifier):
+class xgboost(MultiOutputClassifier, BaseClassifier):
+    def __init__(self, 
+                 n_jobs = 1,
+                 max_depth = None,
+                 min_child_weight = None,
+                 subsample = None,
+                 colsample_bytree = None,
+                 gamma = None,
+                 reg_lambda = None,
+                 reg_alpha = None,
+                 learning_rate = None,
+                 n_estimators = 100,
+                 ):
+        self.n_jobs = n_jobs
+        self.max_depth = max_depth
+        self.min_child_weight = min_child_weight
+        self.subsample = subsample
+        self.colsample_bytree = colsample_bytree
+        self.gamma = gamma
+        self.reg_lambda = reg_lambda
+        self.reg_alpha = reg_alpha
+        self.learning_rate = learning_rate
+        self.n_estimators = n_estimators
+        self.model_type = "multi_xgboost"
+        super().__init__(estimator=XGBClassifier(n_estimators=n_estimators, 
+                                                 max_depth=max_depth, 
+                                                 min_child_weight=min_child_weight,
+                                                 subsample=subsample,
+                                                 colsample_bytree=colsample_bytree,
+                                                 gamma=gamma,
+                                                 reg_lambda=reg_lambda,
+                                                 reg_alpha=reg_alpha,
+                                                 learning_rate=learning_rate,),
+                         n_jobs=self.n_jobs)
+
+
+class __xgboost(XGBClassifier, BaseClassifier):
     def __init__(self, 
                  n_jobs = 1,
                  max_depth = None,
