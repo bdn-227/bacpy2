@@ -65,7 +65,7 @@ class BaseClassifier(ABC):
             train_y = pl.DataFrame({label: dat for label, dat in zip(self.labels, train_x_ls)})
 
         # train the model
-        self.fit(train_x.to_numpy(), train_y.to_pandas())
+        self.fit(np.array(train_x), np.array(train_y))
         if shape == 1:
             self.taxonomic_classes = {level: class_ for level, class_ in zip(self.labels, [self.classes_])}
         else:
