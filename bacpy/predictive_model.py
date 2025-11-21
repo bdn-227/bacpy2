@@ -211,7 +211,7 @@ class BaseClassifier(ABC):
 
         # extract the information
         importances = self.feature_importances_
-        features    = self.feature_names_in_
+        features    = self.features
 
         # create dataframe and perform some formatting
         importance_df = (pl.DataFrame({"importance": importances})
