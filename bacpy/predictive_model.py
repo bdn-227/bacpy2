@@ -50,7 +50,7 @@ class BaseClassifier(ABC):
         train_y = train_set.select(label_set)
 
         # reformat labels to prevent warning
-        #shape = train_y.shape[1]
+        shape = train_y.shape[1]
         #if shape == 1:
         #    train_y = train_y.to_pandas()
 
