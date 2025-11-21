@@ -697,6 +697,7 @@ def plot_dimensional_reduction(
                                perplexity      = False,
                                scale           = True,
                                components      = ["PC1", "PC2"],
+                               alpha           = 0.5,
                                color_map       = "tab20",
                                n_jobs          = -1,
                                figure_name     = "dimensional_reduction",
@@ -784,15 +785,20 @@ def plot_dimensional_reduction(
                 }
     
     else:
-        # get the colors
-        grouped_df = (reduced_df
-                        .group_by(color_by)
-                        .agg(pl.col(components[0]).mean(), pl.col(components[1]).mean()))
-        strains = reduced_df[color_by].unique()
+        if type(color_map) == str:
+            # get the colors
+            grouped_df = (reduced_df
+                            .group_by(color_by)
+                            .agg(pl.col(components[0]).mean(), pl.col(components[1]).mean()))
+            strains = reduced_df[color_by].unique()
 
-        # create the dict
-        colors = _get_color(color_map, len(strains), transparent=True)
-        lut = {val: tuple(colors[idx]) for idx, val in enumerate(strains)}
+            # create the dict
+            colors = _get_color(color_map, len(strains), transparent=True)
+            lut = {val: tuple(colors[idx]) for idx, val in enumerate(strains)}
+        elif type(color_map) == dict:
+            lut = color_map
+        else:
+            ValueError(f"Type of variable should be either str or dict; got {type(color_map)}")
 
         # get additional kwargs
         kwargs= {
@@ -821,16 +827,17 @@ def plot_dimensional_reduction(
                                  color=color, 
                                  zorder=2, 
                                  ax = ax, 
-                                 alpha=0.4)
+                                 alpha=alpha*0.5)
     
     # plot the points
     g = sns.scatterplot(data=reduced_df.to_pandas(),
                         x=components[0], 
                         y=components[1],
-                        alpha = 0.8,
+                        alpha = alpha,
                         s = 80,
                         ax = ax,
-                        edgecolor=None,
+                        edgecolor='none',
+                        linewidth=0,
                         zorder=2,
                         **kwargs)
     
