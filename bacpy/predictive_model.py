@@ -64,7 +64,7 @@ class BaseClassifier(ABC):
 
         # train the model
         if shape == 1:
-            self.fit(train_x.to_pandas(), train_y.to_numpy())
+            self.fit(train_x.to_pandas(), np.array(train_y).reshape(-1))
             self.taxonomic_classes = {level: class_ for level, class_ in zip(self.labels, [self.classes_])}
         else:
             self.fit(train_x.to_pandas(), train_y.to_pandas())
