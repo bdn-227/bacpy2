@@ -51,8 +51,6 @@ class BaseClassifier(ABC):
 
         # reformat labels to prevent warning
         shape = train_y.shape[1]
-        #if shape == 1:
-        #    train_y = train_y.to_pandas()
 
         # perform label encoding of model is xgboost
         if "xgboost" in self.model_type:
@@ -65,10 +63,11 @@ class BaseClassifier(ABC):
             train_y = pl.DataFrame({label: dat for label, dat in zip(self.labels, train_x_ls)})
 
         # train the model
-        self.fit(train_x.to_pandas(), train_y.to_pandas())
         if shape == 1:
+            self.fit(train_x.to_pandas(), train_y.to_numpy())
             self.taxonomic_classes = {level: class_ for level, class_ in zip(self.labels, [self.classes_])}
         else:
+            self.fit(train_x.to_pandas(), train_y.to_pandas())
             self.taxonomic_classes = {level: class_ for level, class_ in zip(self.labels, self.classes_)}
 
 
