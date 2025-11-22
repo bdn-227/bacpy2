@@ -39,4 +39,6 @@ from .predict_reisolation import predictReisolation
 # scripts to create tecan scripts
 from .create_tecan_protocols import create_tecan_scripts
 
+# optimization
+from .optimization_preprossing import optimize_preprocess_platereader
 

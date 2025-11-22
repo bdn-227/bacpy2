@@ -328,9 +328,9 @@ def preprocess_platereader(parsed_data,
 
     # potential log transform
     if arcsinh:
-        fluorescence = fluorescence.with_columns((pl.col("response").arcsinh()).alias("response"))
+        fluroscence = fluroscence.with_columns((pl.col("response").arcsinh()).alias("response"))
     if return_after == "arcsinh":
-        return rf_dat
+        return fluroscence
 
 
     # normalize data
