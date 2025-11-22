@@ -41,4 +41,4 @@ from .create_tecan_protocols import create_tecan_scripts
 
 # optimization
 from .optimization_preprossing import optimize_preprocess_platereader
-
+from .optimization_model import optimize_model_platereader, get_optimized_model

@@ -53,21 +53,24 @@ class BaseClassifier(ABC):
         shape = train_y.shape[1]
 
         # perform label encoding of model is xgboost
-        if "xgboost" in self.model_type:
-            train_x_ls = []
+        if self.model_type in ["neural_net", "multi_xgboost"]:
+            train_y_ls = []
             self.le = {}
             for label in self.labels:
                 self.le[label] = LabelEncoder()
                 self.le[label].fit(train_y[label])
-                train_x_ls.append(self.le[label].transform(train_y[label]))
-            train_y = pl.DataFrame({label: dat for label, dat in zip(self.labels, train_x_ls)})
+                train_y_ls.append(self.le[label].transform(train_y[label]))
+            train_y = pl.DataFrame({label: dat for label, dat in zip(self.labels, train_y_ls)})
+        
+        # because all are multioutput now
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore")
+            self.fit(train_x.to_pandas(), train_y.to_pandas())
 
         # train the model
         if shape == 1:
-            self.fit(train_x.to_pandas(), np.array(train_y).reshape(-1))
             self.taxonomic_classes = {level: class_ for level, class_ in zip(self.labels, [self.classes_])}
         else:
-            self.fit(train_x.to_pandas(), train_y.to_pandas())
             self.taxonomic_classes = {level: class_ for level, class_ in zip(self.labels, self.classes_)}
 
 
@@ -90,7 +93,7 @@ class BaseClassifier(ABC):
         test_x      = test_set.select(self.features)
         metadata    = test_set.select(pl.exclude(self.features)).select(pl.exclude(self.labels))
 
-        if "catboost" in self.model_type:
+        if self.model_type in ["multi_catboost"]:
             pred_d = {label: pred.ravel() for label, pred in zip(self.labels, [est.predict(test_x.to_numpy()) for est in self.estimators_])}
             pred_df = pl.DataFrame(pred_d)
 
@@ -100,7 +103,7 @@ class BaseClassifier(ABC):
             pred_df.columns = self.labels
         
         # convert cats
-        if "xgboost" in self.model_type:
+        if self.model_type in ["neural_net", "multi_xgboost"]:
             for label in self.labels:
                 transformed = self.le[label].inverse_transform(pred_df[label])
                 pred_df = pred_df.drop(label).with_columns(pl.Series(name=label, values=transformed))
@@ -317,6 +320,7 @@ class classifier_randomForest(RandomForestClassifier, BaseClassifier):
                  min_samples_leaf = 1,
                  bootstrap = True
                  ):
+        self.model_type = "tree"
         super().__init__(n_estimators=n_estimators, 
                          n_jobs=n_jobs, 
                          criterion=criterion,
@@ -325,7 +329,6 @@ class classifier_randomForest(RandomForestClassifier, BaseClassifier):
                          min_samples_split=min_samples_split,
                          min_samples_leaf=min_samples_leaf,
                          bootstrap=bootstrap)
-        self.model_type = "tree"
 
 
 
@@ -340,6 +343,7 @@ class classifier_extraTrees(ExtraTreesClassifier, BaseClassifier):
                  min_samples_leaf = 1,
                  bootstrap = True,
                  ):
+        self.model_type = "tree"
         super().__init__(n_estimators=n_estimators, 
                          n_jobs=n_jobs, 
                          max_features=max_features, 
@@ -349,7 +353,6 @@ class classifier_extraTrees(ExtraTreesClassifier, BaseClassifier):
                          min_samples_leaf=min_samples_leaf,
                          bootstrap=bootstrap,
                          )
-        self.model_type = "tree"
 
 
 
@@ -407,8 +410,9 @@ class classifier_xgboost(MultiOutputClassifier, BaseClassifier):
                                                  gamma=gamma,
                                                  reg_lambda=reg_lambda,
                                                  reg_alpha=reg_alpha,
-                                                 learning_rate=learning_rate,),
-                         n_jobs=self.n_jobs)
+                                                 learning_rate=learning_rate,
+                                                 n_jobs=n_jobs),
+                         n_jobs=1)
 
 
 class classifier_catboost(MultiOutputClassifier, BaseClassifier):
@@ -474,8 +478,10 @@ class classifier_neuralnet(MLPClassifier, BaseClassifier):
                  learning_rate_init=0.001,
                  max_iter=200,
                  early_stopping=True,
+                 n_jobs=None,
                  ):
         self.model_type = "neural_net"
+        self.n_jobs = n_jobs
         super().__init__(
                          hidden_layer_sizes=hidden_layer_sizes,
                          activation=activation,
