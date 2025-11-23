@@ -2,7 +2,7 @@
 from abc import ABC
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
-from xgboost import XGBClassifier
+from xgboost.sklearn import XGBClassifier
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import f1_score, accuracy_score, confusion_matrix, matthews_corrcoef
@@ -380,7 +380,7 @@ class classifier_svm(MultiOutputClassifier, BaseClassifier):
 
 class classifier_xgboost(MultiOutputClassifier, BaseClassifier):
     def __init__(self, 
-                 n_jobs = 1,
+                 n_jobs = -1,
                  max_depth = None,
                  min_child_weight = None,
                  subsample = None,
@@ -392,6 +392,7 @@ class classifier_xgboost(MultiOutputClassifier, BaseClassifier):
                  n_estimators = 100,
                  ):
         self.n_jobs = n_jobs
+        self.nthread = n_jobs
         self.max_depth = max_depth
         self.min_child_weight = min_child_weight
         self.subsample = subsample
@@ -411,8 +412,11 @@ class classifier_xgboost(MultiOutputClassifier, BaseClassifier):
                                                  reg_lambda=reg_lambda,
                                                  reg_alpha=reg_alpha,
                                                  learning_rate=learning_rate,
-                                                 n_jobs=n_jobs),
-                         n_jobs=1)
+                                                 nthread=n_jobs,
+                                                 n_jobs=n_jobs,
+                                                 ),
+                         n_jobs=1
+                         )
 
 
 class classifier_catboost(MultiOutputClassifier, BaseClassifier):

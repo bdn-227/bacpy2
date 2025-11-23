@@ -73,7 +73,7 @@ param_grid_catboost = {
     "depth": [None, 4, 6, 8],
     "l2_leaf_reg": [None, 1, 3, 10],
     "bagging_temperature": [None, 0, 0.5, 1.0],
-    "iterations": [None, 500, 1000, 2000],
+    "iterations": [None, 100, 200, 500],
     "early_stopping_rounds": [None, 20, 50, 100],
 }
 
@@ -96,8 +96,7 @@ def optimize_model_platereader(rf_dat,
                                by="f1",
                                cv_folds=5,
                                parameters_per_model=10,
-                               repeats=3,
-                               n_jobs=-1,
+                               n_jobs= -1,
                                filename=None,
                                ):
 
@@ -115,24 +114,25 @@ def optimize_model_platereader(rf_dat,
     param_ls_lightgbm = [sample_params(param_grid_lightbgm) for _ in range(parameters_per_model)]
     param_ls_catboost = [sample_params(param_grid_catboost) for _ in range(parameters_per_model)]
 
-    model_d = {bacpy.classifier_randomForest: param_ls_rf, 
-               bacpy.classifier_extraTrees: param_ls_rf, 
+    model_d = {
                bacpy.classifier_xgboost: param_ls_xgb, 
+               bacpy.classifier_randomForest: param_ls_rf, 
+               bacpy.classifier_extraTrees: param_ls_rf, 
                bacpy.classifier_svm: param_ls_svc, 
                bacpy.classifier_neuralnet: param_ls_nn,
                bacpy.classifier_lightgbm: param_ls_lightgbm,
                bacpy.classifier_catboost: param_ls_catboost,
             }
 
-    total_tests = cv_folds*parameters_per_model*repeats*len(model_d)
-    c = 0
+    total_tests = cv_folds*parameters_per_model*len(model_d)
+    c = 1
     res_ls = []
     for model in model_d.keys():
-        for idx in range(repeats):
-            print(f"TESTING MODEL: {str(model)} - {idx+1}/{repeats} - {round(100*c/total_tests, 2)}%")
+        for idx in range(parameters_per_model):
             kwargs = model_d[model][idx]
-            stats_ls = []
             for i, (train_idx, test_idx) in enumerate(folds, start=1):
+                print(f"TESTING MODEL: {str(model)} - {c}/{total_tests} - {i}th fold - {round(100*c/total_tests, 2)}%")
+                print(f"KWARGS: {str(kwargs)}")
 
                 # get the data
                 train_df = rf_dat[train_idx].select(pl.selectors.starts_with("wv") | pl.selectors.by_name(on))
@@ -141,18 +141,11 @@ def optimize_model_platereader(rf_dat,
                 # train and evaluate model
                 m = model(n_jobs=n_jobs, **kwargs)
                 m.train(train_df)
-                stats_res = m.evaluate(test_df.with_columns(pl.col(on).cast(str)), metric="stats")
-                stats_ls.append(stats_res)
+                stats_res = (m.evaluate(test_df.with_columns(pl.col(on).cast(str)), metric="stats")
+                                .with_columns(pl.lit(str(kwargs)).alias("kwargs"))
+                                .with_columns(pl.lit(str(model)).alias("model")))
+                res_ls.append(stats_res)
                 c+=1
-            stats_df = (pl.concat(stats_ls)
-                            .group_by("taxonomic_level")
-                            .agg(pl.col("accuracy").mean(), 
-                                 pl.col("f1").mean(), 
-                                 pl.col("mcc").mean())
-                            .with_columns(pl.lit(str(kwargs)).alias("kwargs"))
-                            .with_columns(pl.lit(str(model)).alias("model"))
-                        )
-            res_ls.append(stats_df)
     optimization = (pl.concat(res_ls)
                         .with_columns(pl.col("model").str.split(".").list[-1].str.strip_chars_end("'>").alias("model_str"))
                         .sort(by, descending=True))
@@ -164,7 +157,7 @@ def optimize_model_platereader(rf_dat,
 
 
 
-def get_optimized_model(optimization_result, filename=None):
+def get_optimized_model(optimization_result, n_jobs=-1, filename=None):
     best_model_type = optimization_result["model"][0]
     best_model_params = literal_eval(optimization_result["kwargs"][0])
     full_class_path = best_model_type.strip("<class '").strip("'>")
@@ -172,7 +165,7 @@ def get_optimized_model(optimization_result, filename=None):
     try:
         module = importlib.import_module(module_name)
         BestModelClass = getattr(module, class_name)
-        best_model_instance = BestModelClass(best_model_params)
+        best_model_instance = BestModelClass(n_jobs=n_jobs, **best_model_params)
         print(f"Successfully loaded class: {BestModelClass}")
         print(f"Instantiated model: {best_model_instance}")
         if filename is not None:
