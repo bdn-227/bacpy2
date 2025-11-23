@@ -48,7 +48,6 @@ def test_kwargs_platereader(kwargs, idx, kwargs_len, parsed_culture_collections,
 
 def optimize_preprocess_platereader(parsed, 
                                     n_kwargs=-1, 
-                                    repeats=10, 
                                     test_frac=0.2,
                                     equal="strainID",
                                     split_by=False,
@@ -84,13 +83,13 @@ def optimize_preprocess_platereader(parsed,
 
     # add repeats
     args_n = len(kwargs_ls)
-    kwargs_ls = kwargs_ls*repeats
+    kwargs_ls = kwargs_ls*3
 
     # using parallel processing to read the files
     idx = range(len(kwargs_ls))
     total_tests = len(kwargs_ls)
     print(f"NUMBER OF COMBINATIONS TESTED: {args_n}")
-    print(f"NUMBER OF REPEATS PERFORMED: {repeats}")
+    print(f"AVERAGING ACROSS 3 REPEATS")
     print(f"TOTAL ITERATIONS: {total_tests}")
     with get_context("spawn").Pool(processes=n_jobs) as pool:
         test_ls = pool.starmap(test_kwargs_platereader, zip(kwargs_ls, 
