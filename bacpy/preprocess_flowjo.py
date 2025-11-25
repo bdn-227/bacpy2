@@ -113,27 +113,4 @@ def preprocess_cytometry(events_df,
         keep = events_df.select(pl.col(col).is_null().any() for col in feature_cols).transpose(include_header=True, header_name="ex_em").filter(~pl.col("column_0"))["ex_em"].to_list()
         events_df = events_df.select(metadata_cols+keep)
     
-
-    # ~~~~~~~ REMOVE OUTLIERS ~~~~~~~ #
-    if outlier_threshold:
-        if type(outlier_threshold) != int:
-            ValueError(f"VARIABLE `outlier_threshold` IS EXPECTED TO BE `int`; BUT GOT {type(outlier_threshold)}")
-        feature_cols, metadata_cols = get_column_types_flowjo(events_df)
-        keep_ls = []
-        for strain in events_df["strains"].unique():
-            strain_subset = events_df.filter(pl.col("strains")==strain)
-            x = strain_subset.select([col for col in feature_cols if col in strain_subset.columns])
-            x = np.log1p(x)
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore")
-                scaler = StandardScaler()
-                transformer = PCA(n_components=2)
-            x_scaled = scaler.fit_transform(x)
-            transformed = transformer.fit_transform(x_scaled)
-            transformed = zscore(transformed, axis=0)
-            keep = (np.abs(transformed) > outlier_threshold).sum(axis=1) == 0
-            strain_subset = strain_subset.filter(keep)
-            keep_ls.append(strain_subset)
-        events_df = pl.concat(keep_ls)
-    
     return events_df
