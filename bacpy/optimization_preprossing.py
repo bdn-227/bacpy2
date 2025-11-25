@@ -53,6 +53,7 @@ def optimize_preprocess_platereader(parsed,
                                     split_by=False,
                                     model_type=bacpy.classifier_randomForest,
                                     n_jobs=-1,
+                                    repeats=2,
                                     filename=None,
                                     ):
 
@@ -83,13 +84,13 @@ def optimize_preprocess_platereader(parsed,
 
     # add repeats
     args_n = len(kwargs_ls)
-    kwargs_ls = kwargs_ls*3
+    kwargs_ls = kwargs_ls*repeats
 
     # using parallel processing to read the files
     idx = range(len(kwargs_ls))
     total_tests = len(kwargs_ls)
     print(f"NUMBER OF COMBINATIONS TESTED: {args_n}")
-    print(f"AVERAGING ACROSS 3 REPEATS")
+    print(f"AVERAGING ACROSS {repeats} REPEATS")
     print(f"TOTAL ITERATIONS: {total_tests}")
     with get_context("spawn").Pool(processes=n_jobs) as pool:
         test_ls = pool.starmap(test_kwargs_platereader, zip(kwargs_ls, 
