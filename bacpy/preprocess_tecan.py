@@ -397,13 +397,14 @@ def preprocess_platereader(parsed_data,
 
     # remove outliers to get a crisp training-dataset
     if outlier_threshold:
+        feature_cols = np.intersect1d(rf_dat.columns, parsed_data["ex_em"].unique())
 
         # error logging
         if type(outlier_threshold) != int:
             ValueError(f"VARIABLE `outlier_threshold` IS EXPECTED TO BE `int`; BUT GOT {type(outlier_threshold)}")
         
         # perform the actual correction
-        if outlier_column in rf_dat.columns:
+        if (outlier_column in rf_dat.columns) and (len(feature_cols)>2):
             filtered_list = []
 
             # logging
@@ -416,12 +417,11 @@ def preprocess_platereader(parsed_data,
                 strain_subset = rf_dat.filter(pl.col(outlier_column) == strain)
 
                 # scipt for medium, unknown and blanks
-                if strain in ["unknown", pl.Null, None, np.nan, "background", "medium", "blank"]: # , "medium", "blank"??
+                if (strain in ["unknown", pl.Null, None, np.nan, "background", "medium", "blank"]) or (strain_subset.shape[0]<2):
                     filtered_list.append(strain_subset)
 
                 else:
                     # dimensional reduction
-                    feature_cols = np.intersect1d(rf_dat.columns, parsed_data["ex_em"].unique())
                     with warnings.catch_warnings():
                         warnings.filterwarnings("ignore")
                         pca = PCA(n_components = 2)
