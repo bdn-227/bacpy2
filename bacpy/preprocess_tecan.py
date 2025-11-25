@@ -52,13 +52,23 @@ def normalize(fluroscence, normalize_by, indexcols, print_func, logging_func, pl
                                 .drop("mean", "std")
                                 )
         if "auc" in normalize_by:
+            from scipy.integrate import simpson
+            def calculate_auc_safe(s):
+                temp = s.struct.unnest()
+                if len(temp) < 2:
+                    return 0.0
+                return simpson(y=temp["response"], x=temp["em"])
             agg_cols = indexcols + ["ex"]
-            auc_list = []
-            for _, data in fluroscence.group_by(agg_cols):
-                data = data.sort("em")
-                auc = np.trapezoid(y=data["response"], x=data["em"].cast(int))
-                auc_list.append(data.with_columns((pl.col("response") / auc).alias("response")))
-            fluroscence = pl.concat(auc_list, how="vertical")
+            norm_data = (fluroscence
+                            .group_by(agg_cols)
+                            .agg(pl.struct(["em", "response"])
+                                 .sort_by("em")
+                                 .map_elements(calculate_auc_safe, return_dtype=pl.Float64)
+                                 .alias("auc_simpson")))
+            fluroscence = (fluroscence
+                            .join(norm_data, how="left", on=agg_cols)
+                            .with_columns((pl.col("response")/pl.col("auc_simpson")).alias("response"))
+                            .drop("auc_simpson"))
         logging_func(fluroscence)
     return fluroscence
 
@@ -121,7 +131,6 @@ def preprocess_platereader(parsed_data,
                           normalize_by = "scale_ex",
                           impute_strategy = "mean",
                           batches = ["device", "date"],
-                          renorm = True,
                           add_od = False,
                           outlier_threshold = False,
                           multicore=True,
@@ -203,6 +212,7 @@ def preprocess_platereader(parsed_data,
         os.environ["POLARS_MAX_THREADS"] = "1"
     from sklearn.decomposition import PCA
     from scipy.stats import zscore
+    from scipy.integrate import simpson
     import polars as pl
     import numpy as np
     from bacpy.combat import combat
@@ -378,20 +388,6 @@ def preprocess_platereader(parsed_data,
             rf_dat = pl.concat([meta_data, dBatchEffect], how="horizontal")
         print_func(f"dataset shape: {rf_dat.shape}\n")
     if return_after == "batch":
-        return rf_dat
-
-
-    if renorm:
-        fluroscence = (rf_dat
-                            .unpivot(index=indexcols, value_name="response", variable_name="ex_em")
-                            .with_columns(pl.col("ex_em").str.strip_chars("wv").str.split_exact(".", 1).struct.rename_fields(["ex", "em"]).alias("fields"))
-                            .unnest("fields")
-                            .drop("ex_em")
-                      )
-        fluroscence = normalize(fluroscence, normalize_by, indexcols, print_func, logging_func, pl, np)
-        rf_dat = pivot(fluroscence, indexcols, print_func, pl)
-        rf_dat = impute(rf_dat, indexcols, impute_strategy, print_func, pl)
-    if return_after == "renorm":
         return rf_dat
 
 
