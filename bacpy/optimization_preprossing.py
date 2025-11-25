@@ -16,7 +16,7 @@ def test_kwargs_platereader(kwargs, idx, kwargs_len, parsed_culture_collections,
     function to test a combination of kwargs, implemented for compatility of polars with multiprocessing
 
     """
-    print(f"\ntime: {strftime("%Y-%m-%d %H:%M:%S", gmtime())}\ncurrent percent: {round(100*idx/kwargs_len, 2)}%\ntesting:\n{kwargs}\n\n")
+    print(f"\ntime: {strftime("%Y-%m-%d %H:%M:%S", gmtime())}\ncurrent percent: {round(100*idx*repeats/kwargs_len, 2)}%\ntesting:\n{kwargs}\n\n")
     stats_ls = []
     try:
         rf_dat = bacpy.preprocess_platereader(parsed_culture_collections, **kwargs)
@@ -46,7 +46,7 @@ def optimize_preprocess_platereader(parsed,
                                     on="strainID",
                                     print_logs=False,
                                     n_jobs=-1,
-                                    repeats=2,
+                                    repeats=3,
                                     filename=None,
                                     ):
     
