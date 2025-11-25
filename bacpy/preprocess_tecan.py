@@ -426,7 +426,7 @@ def preprocess_platereader(parsed_data,
                         warnings.filterwarnings("ignore")
                         pca = PCA(n_components = 2)
                         transformed = pca.fit_transform(strain_subset.select(feature_cols))
-                    transformed = zscore(transformed, axis=0)
+                        transformed = zscore(transformed, axis=0)
                     keep = (np.abs(transformed) > outlier_threshold).sum(axis=1) == 0
                     strain_subset = strain_subset.filter(keep)
                     filtered_list.append(strain_subset)
