@@ -112,6 +112,7 @@ def preprocess_platereader(parsed_data,
                           batches = ["device", "date"],
                           add_od = False,
                           outlier_threshold = False,
+                          outlier_column = "strainID",
                           multicore=True,
                           print_logs = True,
                           return_after = False,
@@ -402,20 +403,20 @@ def preprocess_platereader(parsed_data,
             ValueError(f"VARIABLE `outlier_threshold` IS EXPECTED TO BE `int`; BUT GOT {type(outlier_threshold)}")
         
         # perform the actual correction
-        if "strainID" in rf_dat.columns:
+        if outlier_column in rf_dat.columns:
             filtered_list = []
 
             # logging
             print_func(f"Removing outliers using PCA..")
 
             # outlier detection can only be performed on training data --> only on bacteria
-            for strain in rf_dat["strainID"].unique():
+            for strain in rf_dat[outlier_column].unique():
 
                 # subset strains specific data and perform pca
-                strain_subset = rf_dat.filter(pl.col("strainID") == strain)
+                strain_subset = rf_dat.filter(pl.col(outlier_column) == strain)
 
                 # scipt for medium, unknown and blanks
-                if strain in ["unknown", pl.Null, None, np.nan]: # , "medium", "blank"??
+                if strain in ["unknown", pl.Null, None, np.nan, "background", "medium", "blank"]: # , "medium", "blank"??
                     filtered_list.append(strain_subset)
 
                 else:
