@@ -35,7 +35,7 @@ def test_kwargs_platereader(kwargs, idx, kwargs_len, parsed_culture_collections,
         try:
             model = model_type(n_jobs=1)
         except:
-            model = model_type
+            model = model_type()
         model.train(train_set)
         stats_validation = model.evaluate(validation_set, metric="stats")
 
