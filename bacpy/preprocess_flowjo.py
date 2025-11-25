@@ -26,6 +26,7 @@ def preprocess_cytometry(events_df,
     from sklearn.decomposition import PCA
     from scipy.stats import zscore
     from sklearn.preprocessing import StandardScaler
+    import warnings
     from bacpy.file_parser_flowjo import get_column_types_flowjo
     print_func = partial(print_text, print_logs=print_logs)
 
@@ -123,8 +124,10 @@ def preprocess_cytometry(events_df,
             strain_subset = events_df.filter(pl.col("strains")==strain)
             x = strain_subset.select([col for col in feature_cols if col in strain_subset.columns])
             x = np.log1p(x)
-            scaler = StandardScaler()
-            transformer = PCA(n_components=2)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore")
+                scaler = StandardScaler()
+                transformer = PCA(n_components=2)
             x_scaled = scaler.fit_transform(x)
             transformed = transformer.fit_transform(x_scaled)
             transformed = zscore(transformed, axis=0)

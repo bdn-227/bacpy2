@@ -14,7 +14,6 @@ from scipy.spatial.distance import pdist, squareform
 from random import randint, uniform
 from matplotlib.patches import Patch
 from itertools import chain
-import warnings
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 from sklearn.preprocessing import StandardScaler

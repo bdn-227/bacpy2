@@ -191,7 +191,7 @@ def preprocess_platereader(parsed_data,
         os.environ["POLARS_MAX_THREADS"] = "1"
     from sklearn.decomposition import PCA
     from scipy.stats import zscore
-    from scipy.integrate import simpson
+    import warnings
     import polars as pl
     import numpy as np
     from bacpy.combat import combat
@@ -391,10 +391,17 @@ def preprocess_platereader(parsed_data,
 
     # add metadata
     rf_dat = rf_dat.join(metadata, how="left", on=indexcols)
-
+    if return_after == "add_metadata":
+        return rf_dat
 
     # remove outliers to get a crisp training-dataset
     if outlier_threshold:
+
+        # error logging
+        if type(outlier_threshold) != int:
+            ValueError(f"VARIABLE `outlier_threshold` IS EXPECTED TO BE `int`; BUT GOT {type(outlier_threshold)}")
+        
+        # perform the actual correction
         if "strainID" in rf_dat.columns:
             filtered_list = []
 
@@ -414,8 +421,10 @@ def preprocess_platereader(parsed_data,
                 else:
                     # dimensional reduction
                     feature_cols = np.intersect1d(rf_dat.columns, parsed_data["ex_em"].unique())
-                    pca = PCA(n_components = 2)
-                    transformed = pca.fit_transform(strain_subset.select(feature_cols))
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("ignore")
+                        pca = PCA(n_components = 2)
+                        transformed = pca.fit_transform(strain_subset.select(feature_cols))
                     transformed = zscore(transformed, axis=0)
                     keep = (np.abs(transformed) > outlier_threshold).sum(axis=1) == 0
                     strain_subset = strain_subset.filter(keep)
