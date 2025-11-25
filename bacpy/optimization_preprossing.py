@@ -99,6 +99,7 @@ def optimize_preprocess_platereader(parsed,
                                                         repeat(repeats)))
 
     # concat and write
+    test_ls = [e for e in test_ls if e is not None]
     test_df = pl.concat(test_ls)
     if filename is not None:
         test_df.write_csv(f"{filename}.tsv", separator="\t")
