@@ -1,27 +1,6 @@
 
 
 
-# for debubbing
-# import bacpy
-# culture_collection_scans = bacpy.abs_path("/biodata/dep_psl/grp_rgo/kieln/inv_spectroscopy_classification/study_scan_collection")
-# mapping=f"{culture_collection_scans}/assay_116/layout_assay_116.tsv"
-# parsed_data=bacpy.parse_dataset_icontrol(mapping=mapping, n_jobs=-1)
-
-## filtering of features
-# feature_list = False
-# filter_common_features = True
-# include_negative = False
-# include_over = False
-# scale_by_medium = True
-# normalize_by = "scale"
-# impute_strategy = "mean"
-# arcsinh = False
-# batches = ["device", "date"]
-# renorm = False
-# add_od = False
-# outlier_threshold = False
-# return_at = False
-# print_logs = True
 
 def print_text(log_text, print_logs=False):
     if print_logs:
@@ -415,9 +394,9 @@ def preprocess_platereader(parsed_data,
 
 
     # remove outliers to get a crisp training-dataset
-    filtered_list = []
     if outlier_threshold:
         if "strainID" in rf_dat.columns:
+            filtered_list = []
 
             # logging
             print_func(f"Removing outliers using PCA..")
@@ -435,14 +414,12 @@ def preprocess_platereader(parsed_data,
                 else:
                     # dimensional reduction
                     feature_cols = np.intersect1d(rf_dat.columns, parsed_data["ex_em"].unique())
-                    pca = PCA(n_components = 1)
-                    red_coord = pca.fit_transform(strain_subset.select(feature_cols))
-
-                    # remove values with high z-score
-                    keep_idx = (np.abs(zscore(red_coord)) < outlier_threshold).reshape(-1)
-                    strain_subset = strain_subset.filter(keep_idx)
+                    pca = PCA(n_components = 2)
+                    transformed = pca.fit_transform(strain_subset.select(feature_cols))
+                    transformed = zscore(transformed, axis=0)
+                    keep = (np.abs(transformed) > outlier_threshold).sum(axis=1) == 0
+                    strain_subset = strain_subset.filter(keep)
                     filtered_list.append(strain_subset)
-
             rf_dat = pl.concat(filtered_list, how="vertical")
             print_func(f"dataset shape: {rf_dat.shape}\n")
 
