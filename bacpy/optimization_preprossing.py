@@ -69,7 +69,7 @@ def optimize_preprocess_platereader(parsed,
                   "batches": [False, ["device", "date"]],
                   "add_od": [False],
                   "outlier_threshold": [False, 1, 2, 3],
-                  "outlier_column": outlier_column,
+                  "outlier_column": [outlier_column],
                   "multicore": [False],
                   "print_logs": [False],
                   "return_after": [False],} 
