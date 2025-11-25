@@ -11,7 +11,7 @@ from sklearn import clone
 
 
 # ~~~~~~~~ MODEL OPTIMIZATION ~~~~~~~~ #
-def test_kwargs_platereader(kwargs, idx, kwargs_len, parsed_culture_collections, test_frac, equal, split_by, model):
+def test_kwargs_platereader(kwargs, idx, kwargs_len, parsed_culture_collections, test_frac, equal, split_by, model, predict):
     """
     function to test a combination of kwargs, implemented for compatility of polars with multiprocessing
 
@@ -24,7 +24,7 @@ def test_kwargs_platereader(kwargs, idx, kwargs_len, parsed_culture_collections,
                                                            equal=equal,
                                                            split_by=split_by)
         clf = clone(model)
-        clf.train(train_set)
+        clf.train(train_set, predict=predict)
         stats_validation = clf.evaluate(validation_set, metric="stats")
         return stats_validation.with_columns(pl.lit(str(kwargs)).alias("kwargs"))
     except Exception as e:
@@ -33,14 +33,19 @@ def test_kwargs_platereader(kwargs, idx, kwargs_len, parsed_culture_collections,
 
 def optimize_preprocess_platereader(parsed, 
                                     n_kwargs=-1, 
+                                    outlier_column = "strainID",
+                                    print_logs=False,
                                     test_frac=0.2,
                                     equal="strainID",
                                     split_by=False,
-                                    model=bacpy.classifier_randomForest(n_jobs=-1),
-                                    outlier_column = "strainID",
+                                    model=bacpy.classifier_randomForest(n_jobs=1, n_estimators=100),
+                                    predict="strainID",
                                     repeats=2,
                                     filename=None,
                                     ):
+    
+    # model configs
+    model.__setattr__("n_jobs", 1)
 
     kwargspace = {"feature_list": [False],
                   "filter_common_features": [True, False],
@@ -55,7 +60,7 @@ def optimize_preprocess_platereader(parsed,
                   "outlier_threshold": [False, 1, 2, 3],
                   "outlier_column": [outlier_column],
                   "multicore": [True],
-                  "print_logs": [False],
+                  "print_logs": [print_logs],
                   "return_after": [False],} 
 
     # put together and shuffle order
@@ -69,9 +74,7 @@ def optimize_preprocess_platereader(parsed,
 
     # add repeats
     args_n = len(kwargs_ls)
-    kwargs_ls = kwargs_ls*repeats
-
-    # using parallel processing to read the files
+    kwargs_ls = kwargs_ls
     total_tests = len(kwargs_ls)
     print(f"NUMBER OF COMBINATIONS TESTED: {args_n}")
     print(f"AVERAGING ACROSS {repeats} REPEATS")
@@ -86,8 +89,9 @@ def optimize_preprocess_platereader(parsed,
     #                                                    repeat(split_by), 
     #                                                    repeat(model_type)))
     test_ls = []
-    for idx, kwargs in enumerate(kwargs_ls):
-        test_ls.append(test_kwargs_platereader(kwargs, idx, total_tests, parsed, test_frac, equal, split_by, model))
+    for _ in range(repeats):
+        for idx, kwargs in enumerate(kwargs_ls):
+            test_ls.append(test_kwargs_platereader(kwargs, idx, total_tests, parsed, test_frac, equal, split_by, model, predict))
 
     # concat and write
     test_df = pl.concat(test_ls)
