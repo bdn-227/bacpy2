@@ -55,6 +55,8 @@ def parse_dataset_evoware(layout, mapping=None, n_jobs=-1, manifest_file="parsin
     print(f"total number of plates:    {n_plates}")
     print(f"total number of files:     {len(file_extensions)}")
     print(f"expected number of files:  {len(expected_extensions)}")
+    if len(file_extensions) != len(expected_extensions):
+        ValueError(f"NUMBER OF DETECTED PLATES DOES NOT MATCH NUMBER OF EXPECTED PLATES..\nEXPECTED: {len(expected_extensions)}\nFOUND: {len(file_extensions)}")
 
     # iterate through file-list and verify scheme
     for idx, e in enumerate(file_extensions):
