@@ -17,7 +17,7 @@ from itertools import chain
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 from sklearn.preprocessing import StandardScaler
-
+from matplotlib.ticker import FuncFormatter
 
 # load bacpy modules
 from bacpy.taxonomy import taxonomy_df
@@ -579,6 +579,16 @@ def plot_cumulative_importance(feature_importances,
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore")
             ax1.set_xticklabels(labels = ax1.get_xticklabels(), rotation=90)
+    
+    # get y-scale and adjust
+    max_abs = ax1.get_ylim()[1]
+    if max_abs == 0:
+        base = 0
+    else:
+        base = int(np.floor(np.log10(max_abs)))
+    if base > 3:
+        scale = 10**base
+        ax1.yaxis.set_major_formatter(FuncFormatter(lambda val, pos: f"{val/scale:.2f}× $10^{{{base}}}$"))
 
 
     if cutoff:
