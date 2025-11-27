@@ -195,7 +195,7 @@ def preprocess_platereader(parsed_data,
     import warnings
     import polars as pl
     import numpy as np
-    from bacpy.combat import combat
+    from .combat import combat
     from functools import partial, reduce
 
 

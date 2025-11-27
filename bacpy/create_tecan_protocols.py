@@ -5,8 +5,8 @@ import numpy as np
 import polars as pl
 
 # import scripts
-from bacpy.tecan_strings import icontrol_plate_range, icontrol_header_abs, icontrol_fluorescent_scan, icontrol_end
-from bacpy.spark_strings import spark_header_abs, spark_fluorescence_scan, spark_end
+from .tecan_strings import icontrol_plate_range, icontrol_header_abs, icontrol_fluorescent_scan, icontrol_end
+from .spark_strings import spark_header_abs, spark_fluorescence_scan, spark_end
 
 
 

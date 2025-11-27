@@ -7,7 +7,7 @@ from os.path import dirname
 from os import listdir
 
 # import self-written modules
-from bacpy.file_parser_evoware import read_metadata, chunk_list, parse_batch
+from .file_parser_evoware import read_metadata, chunk_list, parse_batch
 
 
 

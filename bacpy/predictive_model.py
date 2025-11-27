@@ -17,8 +17,6 @@ from sklearn.multioutput import MultiOutputClassifier
 from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
 
-# load bacpy modules
-from bacpy.taxonomy import taxonomy_dict
 
 
 class BaseClassifier(ABC):

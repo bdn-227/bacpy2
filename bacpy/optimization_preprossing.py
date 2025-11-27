@@ -3,7 +3,8 @@
 import polars as pl
 from itertools import product, repeat
 from multiprocessing import get_context
-import bacpy
+from .preprocess_tecan import preprocess_platereader
+from .predictive_model import train_test_split, classifier_randomForest
 from time import strftime, gmtime
 from random import shuffle
 from sklearn import clone
@@ -19,12 +20,12 @@ def test_kwargs_platereader(kwargs, idx, kwargs_len, parsed_culture_collections,
     print(f"\ntime: {strftime("%Y-%m-%d %H:%M:%S", gmtime())}\ncurrent percent: {round(100*idx*repeats/kwargs_len, 2)}%\ntesting:\n{kwargs}\n\n")
     stats_ls = []
     try:
-        rf_dat = bacpy.preprocess_platereader(parsed_culture_collections, **kwargs)
+        rf_dat = preprocess_platereader(parsed_culture_collections, **kwargs)
         for _ in range(repeats):
-            train_set, validation_set = bacpy.train_test_split(rf_dat, 
-                                                               test_frac = test_frac,
-                                                               equal=equal,
-                                                               split_by=split_by)
+            train_set, validation_set = train_test_split(rf_dat, 
+                                                         test_frac = test_frac,
+                                                         equal=equal,
+                                                         split_by=split_by)
             clf = clone(model)
             clf.train(train_set, predict=on)
             stats_res = clf.evaluate(validation_set, metric="stats")
@@ -42,7 +43,7 @@ def optimize_preprocess_platereader(parsed,
                                     test_frac=0.2,
                                     equal="strainID",
                                     split_by=False,
-                                    model=bacpy.classifier_randomForest(n_jobs=1, n_estimators=100),
+                                    model=classifier_randomForest(n_jobs=1, n_estimators=100),
                                     on="strainID",
                                     print_logs=False,
                                     n_jobs=-1,

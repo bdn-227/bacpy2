@@ -1,7 +1,8 @@
 
 
 # ~~~~~~~ LIBRARIES ~~~~~~~ #
-import bacpy
+from .predictive_model import classifier_catboost, classifier_extraTrees, classifier_lightgbm, classifier_neuralnet, classifier_randomForest, classifier_svm, classifier_xgboost
+from .utils import save_model
 import polars as pl
 import numpy as np
 import random
@@ -115,13 +116,13 @@ def optimize_model_platereader(rf_dat,
     param_ls_catboost = [sample_params(param_grid_catboost) for _ in range(parameters_per_model)]
 
     model_d = {
-               bacpy.classifier_xgboost: param_ls_xgb, 
-               bacpy.classifier_randomForest: param_ls_rf, 
-               bacpy.classifier_extraTrees: param_ls_rf, 
-               bacpy.classifier_svm: param_ls_svc, 
-               bacpy.classifier_neuralnet: param_ls_nn,
-               bacpy.classifier_lightgbm: param_ls_lightgbm,
-               bacpy.classifier_catboost: param_ls_catboost,
+               #classifier_xgboost: param_ls_xgb, 
+               classifier_randomForest: param_ls_rf, 
+               classifier_extraTrees: param_ls_rf, 
+               classifier_svm: param_ls_svc, 
+               classifier_neuralnet: param_ls_nn,
+               classifier_lightgbm: param_ls_lightgbm,
+               classifier_catboost: param_ls_catboost,
             }
 
     total_tests = cv_folds*parameters_per_model*len(model_d)
@@ -169,7 +170,7 @@ def get_optimized_model(optimization_result, n_jobs=-1, filename=None):
         print(f"Successfully loaded class: {BestModelClass}")
         print(f"Instantiated model: {best_model_instance}")
         if filename is not None:
-            bacpy.save_model(best_model_instance, filename)
+            save_model(best_model_instance, filename)
         return best_model_instance
     except (ImportError, AttributeError) as e:
         print(f"Error loading class '{full_class_path}': {e}")

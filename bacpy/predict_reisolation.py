@@ -1,8 +1,7 @@
 
 # load imports
-from bacpy.predictive_model import classifier_randomForest, train_test_split
-from bacpy.preprocess_tecan import preprocess_platereader
-from bacpy.plotting import plot_confusion_matrix
+from .predictive_model import classifier_randomForest, train_test_split
+from .plotting import plot_confusion_matrix
 from scipy.stats import hmean
 import pandas as pd
 import numpy as np

@@ -20,7 +20,7 @@ from sklearn.preprocessing import StandardScaler
 from matplotlib.ticker import FuncFormatter
 
 # load bacpy modules
-from bacpy.taxonomy import taxonomy_df
+from .taxonomy import taxonomy_df
 
 
 def _generate_random_rgba_colors(n, transparent=False):

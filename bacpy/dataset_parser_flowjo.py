@@ -1,4 +1,4 @@
-from bacpy.file_parser_flowjo import parse_file_flowjo, cols
+from .file_parser_flowjo import parse_file_flowjo, cols
 import os
 import polars as pl
 import time

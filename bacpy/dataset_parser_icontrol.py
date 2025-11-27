@@ -7,8 +7,8 @@ from os.path import dirname
 from os import listdir
 
 # import self-written modules
-from bacpy.file_parser_evoware import read_metadata
-from bacpy.file_parser_icontrol import parse_file_icontrol
+from .file_parser_evoware import read_metadata
+from .file_parser_icontrol import parse_file_icontrol
 
 
 

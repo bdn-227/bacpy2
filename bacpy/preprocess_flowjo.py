@@ -21,13 +21,8 @@ def preprocess_cytometry(events_df,
         import os
         os.environ["POLARS_MAX_THREADS"] = "1"
     import polars as pl
-    import numpy as np
     from functools import partial
-    from sklearn.decomposition import PCA
-    from scipy.stats import zscore
-    from sklearn.preprocessing import StandardScaler
-    import warnings
-    from bacpy.file_parser_flowjo import get_column_types_flowjo
+    from .file_parser_flowjo import get_column_types_flowjo
     print_func = partial(print_text, print_logs=print_logs)
 
     events_ls = []
