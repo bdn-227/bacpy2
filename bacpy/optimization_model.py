@@ -132,20 +132,23 @@ def optimize_model_platereader(rf_dat,
         for idx in range(parameters_per_model):
             kwargs = model_d[model][idx]
             for i, (train_idx, test_idx) in enumerate(folds, start=1):
-                print(f"TESTING MODEL: {str(model)} - {c}/{total_tests} - {i}th fold - {round(100*c/total_tests, 2)}%")
-                print(f"KWARGS: {str(kwargs)}")
+                try:
+                    print(f"TESTING MODEL: {str(model)} - {c}/{total_tests} - {i}th fold - {round(100*c/total_tests, 2)}%")
+                    print(f"KWARGS: {str(kwargs)}")
 
-                # get the data
-                train_df = rf_dat[train_idx].select(pl.selectors.starts_with("wv") | pl.selectors.by_name(on))
-                test_df  = rf_dat[test_idx].select(pl.selectors.starts_with("wv") | pl.selectors.by_name(on))
+                    # get the data
+                    train_df = rf_dat[train_idx].select(pl.selectors.starts_with("wv") | pl.selectors.by_name(on))
+                    test_df  = rf_dat[test_idx].select(pl.selectors.starts_with("wv") | pl.selectors.by_name(on))
 
-                # train and evaluate model
-                m = model(n_jobs=n_jobs, **kwargs)
-                m.train(train_df)
-                stats_res = (m.evaluate(test_df.with_columns(pl.col(on).cast(str)), metric="stats")
-                                .with_columns(pl.lit(str(kwargs)).alias("kwargs"))
-                                .with_columns(pl.lit(str(model)).alias("model")))
-                res_ls.append(stats_res)
+                    # train and evaluate model
+                    m = model(n_jobs=n_jobs, **kwargs)
+                    m.train(train_df)
+                    stats_res = (m.evaluate(test_df.with_columns(pl.col(on).cast(str)), metric="stats")
+                                    .with_columns(pl.lit(str(kwargs)).alias("kwargs"))
+                                    .with_columns(pl.lit(str(model)).alias("model")))
+                    res_ls.append(stats_res)
+                except ValueError as e:
+                    print(f"ERROR ENCOUNTERED FOR {model} - {str(kwargs)} - {e}")
                 c+=1
     optimization = (pl.concat(res_ls)
                         .with_columns(pl.col("model").str.split(".").list[-1].str.strip_chars_end("'>").alias("model_str"))
