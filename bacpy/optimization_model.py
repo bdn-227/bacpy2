@@ -146,9 +146,11 @@ def optimize_model_platereader(rf_dat,
                     stats_res = (m.evaluate(test_df.with_columns(pl.col(on).cast(str)), metric="stats")
                                     .with_columns(pl.lit(str(kwargs)).alias("kwargs"))
                                     .with_columns(pl.lit(str(model)).alias("model")))
-                    res_ls.append(stats_res)
                 except ValueError as e:
                     print(f"ERROR ENCOUNTERED FOR {model} - {str(kwargs)} - {e}")
+                    # taxonomic_level	accuracy	f1	mcc	kwargs	model
+                    stats_res = pl.DataFrame({"taxonomic_level": on, "accuracy": 0.0, "f1": 0.0, "mcc": 0.0, "kwargs": str(kwargs), "model": str(model)})
+                res_ls.append(stats_res)
                 c+=1
     optimization = (pl.concat(res_ls)
                         .with_columns(pl.col("model").str.split(".").list[-1].str.strip_chars_end("'>").alias("model_str"))
