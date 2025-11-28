@@ -11,6 +11,7 @@ from sklearn.model_selection import StratifiedKFold
 import importlib
 from scipy.stats import randint
 from ast import literal_eval
+import datetime
 
 # 2. define search spaces for models
 param_grid_rf = {
@@ -133,7 +134,9 @@ def optimize_model_platereader(rf_dat,
             kwargs = model_d[model][idx]
             for i, (train_idx, test_idx) in enumerate(folds, start=1):
                 try:
-                    print(f"TESTING MODEL: {str(model)} - {c}/{total_tests} - {i}th fold - {round(100*c/total_tests, 2)}%")
+                    now = datetime.datetime.now()
+                    current_time = now.strftime("%H:%M:%S")
+                    print(f"TESTING MODEL {current_time} - {str(model)} - {c}/{total_tests} - {i}th fold - {round(100*c/total_tests, 2)}%")
                     print(f"KWARGS: {str(kwargs)}")
 
                     # get the data
