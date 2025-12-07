@@ -47,9 +47,6 @@ class BaseClassifier(ABC):
         train_x = train_set.select(feature_set)
         train_y = train_set.select(label_set)
 
-        # reformat labels to prevent warning
-        shape = train_y.shape[1]
-
         # perform label encoding of model is xgboost
         if self.model_type in ["neural_net", "multi_xgboost"]:
             train_y_ls = []
@@ -66,7 +63,8 @@ class BaseClassifier(ABC):
             self.fit(train_x.to_pandas(), train_y.to_pandas())
 
         # train the model
-        if shape == 1:
+        shape = train_y.shape[1]
+        if (self.model_type in ["neural_net", "tree"]) and (shape == 1):
             self.taxonomic_classes = {level: class_ for level, class_ in zip(self.labels, [self.classes_])}
         else:
             self.taxonomic_classes = {level: class_ for level, class_ in zip(self.labels, self.classes_)}
