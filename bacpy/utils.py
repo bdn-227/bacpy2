@@ -16,7 +16,8 @@ def save_model(model, filename = 'model'):
 
 
 def load_model(filename):
-    return joblib.load(filename)
-
+    model = joblib.load(filename)
+    print(f"LOADED: {model}")
+    return model
 
 
