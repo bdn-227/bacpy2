@@ -413,7 +413,7 @@ class classifier_xgboost(MultiOutputClassifier, BaseClassifier):
                                                  nthread=n_jobs,
                                                  n_jobs=n_jobs,
                                                  ),
-                         n_jobs=1
+                         n_jobs=n_jobs
                          )
 
 
@@ -468,7 +468,7 @@ class classifier_lightgbm(MultiOutputClassifier, BaseClassifier):
                                                   n_jobs = n_jobs,
                                                   **kwargs
                                                   ),
-                         n_jobs=1)
+                         n_jobs=n_jobs)
 
 
 class classifier_neuralnet(MLPClassifier, BaseClassifier):
