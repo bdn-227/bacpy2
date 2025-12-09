@@ -674,6 +674,7 @@ def plot_fluorescent_response(rf_dat,
                             hue=color_by,
                             kind="line",
                             facet_kws=dict(sharey=False),
+                            err_kws=dict(linewidth=0),
                             palette=palette,
                             height=figsize[1],
                             aspect=figsize[0]/figsize[1],
@@ -685,7 +686,7 @@ def plot_fluorescent_response(rf_dat,
     wv_plot.set(xlabel='Emission wavelength', ylabel='Fluorescent response')
 
     wv_plot.figure.subplots_adjust(top=.9)
-    wv_plot.figure.suptitle(f'Fluorescence responses upon excitation with {excitation_wavelength}nm')
+    wv_plot.figure.suptitle(f'Excitation with {excitation_wavelength}nm')
 
     wv_plot.savefig(f"{figure_name}_ex{excitation_wavelength}.png", dpi=600)
     wv_plot.savefig(f"{figure_name}_ex{excitation_wavelength}.pdf")
