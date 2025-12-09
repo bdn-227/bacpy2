@@ -686,7 +686,7 @@ def plot_fluorescent_response(rf_dat,
     wv_plot.set(xlabel='Emission wavelength', ylabel='Fluorescent response')
 
     wv_plot.figure.subplots_adjust(top=.9)
-    wv_plot.figure.suptitle(f'Excitation with {excitation_wavelength}nm')
+    wv_plot.figure.suptitle(f'Excitation with {excitation_wavelength} nm')
 
     wv_plot.savefig(f"{figure_name}_ex{excitation_wavelength}.png", dpi=600)
     wv_plot.savefig(f"{figure_name}_ex{excitation_wavelength}.pdf")
