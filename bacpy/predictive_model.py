@@ -70,8 +70,45 @@ class BaseClassifier(ABC):
             self.taxonomic_classes = {level: class_ for level, class_ in zip(self.labels, self.classes_)}
 
 
+    def __predict_proba(self, test_x, confidence=0):
+        pred_probs = self.predict_proba(test_x)
+        if type(pred_probs) != list:
+            pred_probs = [pred_probs]
+        if type(self.classes_) != list:
+            classes_ls = [self.classes_]
+        else:
+            classes_ls = self.classes_
+        pred_ls = []
+        for pred_prob_level, classes in zip(pred_probs, classes_ls):
+            max_probs = np.max(pred_prob_level, axis=1)
+            best_class_indices = np.argmax(pred_prob_level, axis=1)
+            best_class_names = classes[best_class_indices]
+            mask = max_probs >= confidence
+            n_classified = mask.sum()
+            if n_classified == 0:
+                ValueError(f"ERROR: CONFIDENCE IS TOO HIGH, ZERO CLASSES LEFT..")
+            best_class_names[~mask] = "UNCLASSIFIED"
+            pred_ls.append(best_class_names)
+        pred_mat = np.column_stack(pred_ls)
+        return pred_mat
+
+
+    def __predict_proba_catboost(self, test_x, est, confidence=0):
+        pred_probs = est.predict_proba(test_x)
+        max_probs = np.max(pred_probs, axis=1)
+        best_class_indices = np.argmax(pred_probs, axis=1)
+        best_class_names = est.classes_[best_class_indices]
+        mask = max_probs >= confidence
+        n_classified = mask.sum()
+        if n_classified == 0:
+            ValueError(f"ERROR: CONFIDENCE IS TOO HIGH, ZERO CLASSES LEFT..")
+        best_class_names[~mask] = "UNCLASSIFIED"
+        return best_class_names
+
+
     def predict_strains(self, 
-                        test_set):
+                        test_set,
+                        confidence=0):
         """
         function to predict the taxonomy of bacterial spectra
         test_set            pl.DataFrame    a dataframe containing feautres (generated with bacpy.preprocess_data)
@@ -90,11 +127,17 @@ class BaseClassifier(ABC):
         metadata    = test_set.select(pl.exclude(self.features)).select(pl.exclude(self.labels))
 
         if self.model_type in ["multi_catboost"]:
-            pred_d = {label: pred.ravel() for label, pred in zip(self.labels, [est.predict(test_x.to_numpy()) for est in self.estimators_])}
+            if confidence > 0:
+                pred_d = {label: pred.ravel() for label, pred in zip(self.labels, [self.__predict_proba_catboost(test_x.to_pandas(), est, confidence) for est in self.estimators_])}
+            else:
+                pred_d = {label: pred.ravel() for label, pred in zip(self.labels, [est.predict(test_x.to_pandas()) for est in self.estimators_])}
             pred_df = pl.DataFrame(pred_d)
 
         else:
-            pred = self.predict(test_x.to_pandas())
+            if confidence > 0:
+                pred = self.__predict_proba(test_x.to_pandas(), confidence)
+            else:
+                pred = self.predict(test_x.to_pandas())
             pred_df = pl.DataFrame(pred)
             pred_df.columns = self.labels
         
@@ -110,6 +153,7 @@ class BaseClassifier(ABC):
 
     def evaluate(self, 
                  validation_set, 
+                 confidence=0,
                  metric="cm", # cm | stats | both
                  average="weighted",
                  ):
@@ -127,7 +171,7 @@ class BaseClassifier(ABC):
         truth = validation_set.select(self.labels)
 
         # perform the predictions
-        pred = self.predict_strains(validation_x)
+        pred = self.predict_strains(validation_x, confidence)
         
 
         # nulls in predictions probably need to be replaced
@@ -149,42 +193,50 @@ class BaseClassifier(ABC):
         cm_dict = {}
 
         # iterate through taxonomic levels
-        for label in np.intersect1d(truth.columns, pred.columns):
+        for tax_level in np.intersect1d(truth.columns, pred.columns):
 
             # extract the labels
-            labels = self.taxonomic_classes[label]
+            labels = self.taxonomic_classes[tax_level]
+            idx = pred[tax_level] != "UNCLASSIFIED"
+            y_pred = pred.filter(idx)[tax_level]
+            y_true = truth.filter(idx)[tax_level]
 
             # convert for xgboost
             if "xgboost" in self.model_type:
-                labels = self.le[label].inverse_transform(labels)
+                labels = self.le[tax_level].inverse_transform(labels)
 
             # get the calsses used for predictions
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore")
-                cm = pl.DataFrame(confusion_matrix(y_true=truth[label], y_pred=pred[label], labels=labels))
+                cm = pl.DataFrame(confusion_matrix(y_true=y_true, y_pred=y_pred, labels=labels))
             cm.columns = labels
-            cm = cm.with_columns(pl.Series(labels).alias(label))
-            cm_dict[label] = cm
+            cm = cm.with_columns(pl.Series(labels).alias(tax_level))
+            cm_dict[tax_level] = cm
         
         return cm_dict
     
 
     def _get_stats(self, truth, pred, average):
         stats_ls = []
-        for label in np.intersect1d(truth.columns, pred.columns):
-            labels = np.union1d(truth[label], pred[label])
+        for tax_level in np.intersect1d(truth.columns, pred.columns):
+            labels = np.union1d(truth[tax_level], pred[tax_level])
+            idx = pred[tax_level] != "UNCLASSIFIED"
+            y_pred = pred.filter(idx)[tax_level]
+            y_true = truth.filter(idx)[tax_level]
+            labels = np.union1d(y_true, y_pred)
+
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore")
-                accuracy = accuracy_score(truth[label], pred[label])
-                mcc = matthews_corrcoef(truth[label],pred[label])
-                f1 = f1_score(truth[label], pred[label], average = average, labels=labels)
+                accuracy = accuracy_score(y_true, y_pred)
+                mcc = matthews_corrcoef(y_true, y_pred)
+                f1 = f1_score(y_true, y_pred, average = average, labels=labels)
             if average is None:
-                stats_res = pl.DataFrame({"taxonomic_level": label,
+                stats_res = pl.DataFrame({"taxonomic_level": tax_level,
                                           "f1": f1,
                                           "taxonomy": labels
                                         })
             else:
-                stats_res = pl.DataFrame({"taxonomic_level": label, 
+                stats_res = pl.DataFrame({"taxonomic_level": tax_level, 
                                           "accuracy": accuracy, 
                                           "f1": f1, 
                                           "mcc": mcc})
