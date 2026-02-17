@@ -244,6 +244,8 @@ def parse_file_icontrol(excel_path):
             # split the dataframe into chunks from "LabelXX" to "End Time"
             starts = raw[:,0].str.starts_with("Mode").arg_true()
             ends   = raw[:,0].str.starts_with("End Time").arg_true()
+            kinetic = False ######## <------- in case a  'NoneType' object has no attribute 'split error occurs, here is where 
+            # the correct logic goes
         else:
             """
             normal tecan icontrol script
