@@ -16,7 +16,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.multioutput import MultiOutputClassifier
 from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
-from typing import Optional, List, Union, Dict, Tuple
+from typing import Optional, List, Union, Dict, Tuple, Any
 
 
 
@@ -443,14 +443,14 @@ class classifier_randomForest(RandomForestClassifier, BaseClassifier):
             architecture for downstream interpretation tools.
     """
     def __init__(self, 
-                 n_jobs = 1, 
-                 n_estimators = 500,
-                 criterion = "gini", 
-                 max_features = "sqrt",
-                 max_depth = None,
-                 min_samples_split = 2,
-                 min_samples_leaf = 1,
-                 bootstrap = True
+                 n_jobs: int = 1, 
+                 n_estimators: int = 500,
+                 criterion: str = "gini", 
+                 max_features: Union[str, int, float, None] = "sqrt",
+                 max_depth: Optional[int] = None,
+                 min_samples_split: Union[int, float] = 2,
+                 min_samples_leaf: Union[int, float] = 1,
+                 bootstrap: bool = True
                  ):
         self.model_type = "tree"
         super().__init__(n_estimators=n_estimators, 
@@ -465,15 +465,43 @@ class classifier_randomForest(RandomForestClassifier, BaseClassifier):
 
 
 class classifier_extraTrees(ExtraTreesClassifier, BaseClassifier):
+    """
+    An Extra Trees (Extremely Randomized Trees) classifier wrapper.
+
+    Inherits from Scikit-learn's ExtraTreesClassifier and BaseClassifier. This 
+    model differs from Random Forest by choosing split points at random for 
+    each feature rather than searching for the most discriminative threshold, 
+    often resulting in reduced variance and increased computational efficiency.
+
+    Args:
+        n_jobs: Number of CPU cores to use for parallel fitting and prediction. 
+            Defaults to 1. Set to -1 to use all available cores.
+        n_estimators: The number of trees in the forest. Defaults to 500.
+        criterion: The function to measure the quality of a split ("gini" 
+            or "entropy").
+        max_features: The number of features to consider when looking for the 
+            best split (e.g., "sqrt", "log2").
+        max_depth: The maximum depth of the trees. If None, nodes are expanded 
+            until all leaves are pure.
+        min_samples_split: The minimum number of samples required to split 
+            an internal node.
+        min_samples_leaf: The minimum number of samples required to be at 
+            a leaf node.
+        bootstrap: Whether bootstrap samples are used when building trees.
+
+    Attributes:
+        model_type: Set to "tree", ensuring compatibility with BaseClassifier's 
+            internal logic for label handling and feature importance.
+    """
     def __init__(self, 
-                 n_jobs = 1, 
-                 n_estimators = 500,
-                 criterion = "gini", 
-                 max_features = "sqrt",
-                 max_depth = None,
-                 min_samples_split = 2,
-                 min_samples_leaf = 1,
-                 bootstrap = True,
+                 n_jobs: int = 1, 
+                 n_estimators: int = 500,
+                 criterion: str = "gini", 
+                 max_features: Union[str, int, float, None] = "sqrt",
+                 max_depth: Optional[int] = None,
+                 min_samples_split: Union[int, float] = 2,
+                 min_samples_leaf: Union[int, float] = 1,
+                 bootstrap: bool = True,
                  ):
         self.model_type = "tree"
         super().__init__(n_estimators=n_estimators, 
@@ -489,12 +517,37 @@ class classifier_extraTrees(ExtraTreesClassifier, BaseClassifier):
 
 
 class classifier_svm(MultiOutputClassifier, BaseClassifier):
+    """
+    A Multi-Output Support Vector Machine (SVM) classifier wrapper.
+
+    This class leverages the MultiOutputClassifier strategy to extend binary/multiclass 
+    SVMs to the hierarchical taxonomic structures used in spectral data analysis. 
+    It is particularly effective for high-dimensional data where clear margins 
+    exist between spectral fingerprints.
+
+    Args:
+        n_jobs: The number of jobs to run in parallel. SVM training for multiple 
+            outputs is parallelized by fitting one regressor per target. 
+            Defaults to 1. Set to -1 to use all processors.
+        kernel: Specifies the kernel type to be used in the algorithm. 
+            Options include 'linear', 'poly', 'rbf', 'sigmoid', or 'precomputed'.
+        C: Regularization parameter. The strength of the regularization is 
+            inversely proportional to C. Must be strictly positive.
+        gamma: Kernel coefficient for 'rbf', 'poly', and 'sigmoid'. 
+            'scale' (default) uses 1 / (n_features * X.var()).
+        class_weight: Set the parameter C of class i to class_weight[i]*C for 
+            SVC. If 'balanced', uses values of y to automatically adjust weights.
+
+    Attributes:
+        model_type: Set to "multi_svm", used by BaseClassifier to determine 
+            compatible diagnostic and encoding paths.
+    """
     def __init__(self, 
-                 n_jobs = 1,
-                 kernel = "rbf",
-                 C = 1,
-                 gamma = "scale",
-                 class_weight = None,
+                 n_jobs: int = 1,
+                 kernel: str = "rbf",
+                 C: Union[int, float] = 1,
+                 gamma: Union[str, float] = "scale",
+                 class_weight: Optional[Union[Dict, str]] = None,
                  ):
         self.n_jobs = n_jobs
         self.kernel = kernel
@@ -511,17 +564,47 @@ class classifier_svm(MultiOutputClassifier, BaseClassifier):
 
 
 class classifier_xgboost(MultiOutputClassifier, BaseClassifier):
+    """
+    A Multi-Output XGBoost classifier wrapper.
+
+    This class leverages eXtreme Gradient Boosting (XGBoost) for high-performance 
+    classification of spectral and cytometry data. By utilizing the 
+    MultiOutputClassifier strategy, it fits one XGBoost model per taxonomic level. 
+    It is highly robust to missing values and features specialized regularization 
+    parameters to prevent overfitting.
+
+    Args:
+        n_jobs: Number of parallel threads used to run XGBoost. Defaults to -1 
+            (uses all available cores).
+        max_depth: Maximum tree depth for base learners. Increasing this value 
+            makes the model more complex and likely to overfit.
+        min_child_weight: Minimum sum of instance weight (hessian) needed in a 
+            child. Used to control over-fitting.
+        subsample: Subsample ratio of the training instances.
+        colsample_bytree: Subsample ratio of columns when constructing each tree.
+        gamma: Minimum loss reduction required to make a further partition on 
+            a leaf node of the tree.
+        reg_lambda: L2 regularization term on weights.
+        reg_alpha: L1 regularization term on weights.
+        learning_rate: Step size shrinkage used in update to prevent overfitting.
+        n_estimators: Number of gradient boosted trees (boosting rounds). 
+            Defaults to 100.
+
+    Attributes:
+        model_type: Set to "multi_xgboost", which ensures the BaseClassifier 
+            applies LabelEncoder to the taxonomic targets during training.
+    """
     def __init__(self, 
-                 n_jobs = -1,
-                 max_depth = None,
-                 min_child_weight = None,
-                 subsample = None,
-                 colsample_bytree = None,
-                 gamma = None,
-                 reg_lambda = None,
-                 reg_alpha = None,
-                 learning_rate = None,
-                 n_estimators = 100,
+                 n_jobs: int = -1,
+                 max_depth: Optional[int] = None,
+                 min_child_weight: Optional[float] = None,
+                 subsample: Optional[float] = None,
+                 colsample_bytree: Optional[float] = None,
+                 gamma: Optional[float] = None,
+                 reg_lambda: Optional[float] = None,
+                 reg_alpha: Optional[float] = None,
+                 learning_rate: Optional[float] = None,
+                 n_estimators: int = 100,
                  ):
         self.n_jobs = n_jobs
         self.nthread = n_jobs
@@ -552,12 +635,39 @@ class classifier_xgboost(MultiOutputClassifier, BaseClassifier):
 
 
 class classifier_catboost(MultiOutputClassifier, BaseClassifier):
+    """
+    A Multi-Output CatBoost classifier wrapper.
+
+    This class utilizes the CatBoost library to perform gradient boosting on 
+    spectral datasets. CatBoost uses oblivious decision trees, which are 
+    balanced and less prone to overfitting. This wrapper employs a 
+    MultiOutputClassifier strategy to predict multiple taxonomic ranks.
+
+    Args:
+        iterations: The maximum number of trees that can be built. 
+            Defaults to None (uses library default).
+        learning_rate: The step size used for updating weights during 
+            training to prevent overfitting.
+        early_stopping_rounds: The number of rounds to wait for a 
+            metric improvement before stopping training early.
+        n_jobs: The number of threads to use during training. 
+            Passed to CatBoost as `thread_count`.
+        **kwargs: Additional keyword arguments passed directly to the 
+            underlying CatBoostClassifier.
+
+    Attributes:
+        model_type: Set to "multi_catboost", triggering specialized 
+            prediction and evaluation paths in BaseClassifier.
+        allow_writing_files: Set to False to prevent CatBoost from 
+            creating diagnostic folders (e.g., catboost_info).
+        save_snapshot: Set to False to disable training snapshots.
+    """
     def __init__(self, 
-                 iterations = None,
-                 learning_rate = None,
-                 early_stopping_rounds = None,
-                 n_jobs=1,
-                 **kwargs
+                 iterations: Optional[int] = None,
+                 learning_rate: Optional[float] = None,
+                 early_stopping_rounds: Optional[int] = None,
+                 n_jobs: int = 1,
+                 **kwargs: Any
                  ):
         self.iterations = iterations
         self.learning_rate = learning_rate
@@ -578,14 +688,37 @@ class classifier_catboost(MultiOutputClassifier, BaseClassifier):
 
 
 class classifier_lightgbm(MultiOutputClassifier, BaseClassifier):
+    """
+    A Multi-Output LightGBM classifier wrapper.
+
+    This class utilizes the Light Gradient Boosting Machine (LightGBM) for 
+    high-speed classification of spectral data. It employs a leaf-wise tree 
+    growth strategy and a MultiOutputClassifier approach to handle multiple 
+    taxonomic ranks simultaneously.
+
+    Args:
+        num_leaves: Maximum tree leaves for base learners. This is the main 
+            parameter to control the complexity of the tree model.
+        n_estimators: Number of boosted trees to fit. Defaults to 100.
+        max_depth: Maximum tree depth for base learners. -1 means no limit.
+        boosting_type: 'gbdt' (traditional Gradient Boosting Decision Tree), 
+            'dart' (Dropouts meet Multiple Additive Regression Trees), or 'rf'.
+        learning_rate: Boosting learning rate (step size shrinkage).
+        n_jobs: Number of parallel threads. Defaults to None.
+        **kwargs: Additional keyword arguments passed to the LGBMClassifier.
+
+    Attributes:
+        model_type: Set to "multi_lightbgm", identifying the algorithm 
+            category for BaseClassifier logic.
+    """
     def __init__(self,
-                 num_leaves=31,
-                 n_estimators=100,
-                 max_depth=-1,
-                 boosting_type = "gbdt",
-                 learning_rate=0.1,
-                 n_jobs=None,
-                 **kwargs
+                 num_leaves: int = 31,
+                 n_estimators: int = 100,
+                 max_depth: int = -1,
+                 boosting_type: str = "gbdt",
+                 learning_rate: float = 0.1,
+                 n_jobs: Optional[int] = None,
+                 **kwargs: Any
                  ):
         self.n_estimators = n_estimators
         self.boosting_type = boosting_type
@@ -606,15 +739,45 @@ class classifier_lightgbm(MultiOutputClassifier, BaseClassifier):
 
 
 class classifier_neuralnet(MLPClassifier, BaseClassifier):
+    """
+    A Multi-layer Perceptron (MLP) Neural Network classifier wrapper.
+
+    This class implements a feedforward artificial neural network that uses 
+    backpropagation for training. It is highly flexible and capable of 
+    learning non-linear models, making it suitable for complex spectral 
+    patterns where feature interactions are highly non-linear.
+    Requires careful scaling of features
+
+    Args:
+        hidden_layer_sizes: The ith element represents the number of neurons 
+            in the ith hidden layer. Defaults to (100,).
+        activation: Activation function for the hidden layer. 
+            Options: 'identity', 'logistic', 'tanh', 'relu'.
+        alpha: Strength of the L2 regularization term (penalty).
+        solver: The solver for weight optimization. 
+            Options: 'lbfgs', 'sgd', 'adam'.
+        learning_rate_init: The initial learning rate used. It controls the 
+            step-size in updating the weights.
+        max_iter: Maximum number of iterations. The solver iterates until 
+            convergence or this number of iterations.
+        early_stopping: Whether to use early stopping to terminate training 
+            when validation score is not improving.
+        n_jobs: Number of parallel jobs to run (though standard MLPClassifier 
+            utilizes internal CPU threading via BLAS/LAPACK).
+
+    Attributes:
+        model_type: Set to "neural_net", identifying the model for 
+            BaseClassifier's label encoding and internal logic.
+    """
     def __init__(self,
-                 hidden_layer_sizes=(100,),
-                 activation = "relu",
-                 alpha=0.0001,
-                 solver="adam",
-                 learning_rate_init=0.001,
-                 max_iter=200,
-                 early_stopping=True,
-                 n_jobs=None,
+                 hidden_layer_sizes: Tuple[int, ...] = (100,),
+                 activation: str = "relu",
+                 alpha: float = 0.0001,
+                 solver: str = "adam",
+                 learning_rate_init: float = 0.001,
+                 max_iter: int = 200,
+                 early_stopping: bool = True,
+                 n_jobs: Optional[int] = None,
                  ):
         self.model_type = "neural_net"
         self.n_jobs = n_jobs
@@ -631,21 +794,36 @@ class classifier_neuralnet(MLPClassifier, BaseClassifier):
 
 
 def train_test_split(
-                     rf_dat, 
-                     test_frac = 0.2, 
-                     split_by = False, 
-                     equal = False, 
-                     ):
+                        rf_dat: pl.DataFrame, 
+                        test_frac: float = 0.2, 
+                        split_by: Union[bool, str] = False, 
+                        equal: Union[bool, str] = False, 
+                    ) -> Tuple[pl.DataFrame, pl.DataFrame]:
     """
-    function to split a parsed and processed dataset (rf_dat) into
-    two datasets, one for validation and one for testing
-    rf_dat      pl.DataFrame    processed dataset to be splitted
-    test_frac   float           default: 0.2; fraction of the dataset that will be used for testing
-    split_by    bool | str      default: False; if False, splitting occurs randomly, if str,
-                                dataset separation will be according to split_by
-                                i.e. split_by="strainID" means that a given strain is either testing or training, but not both
-                                used to predict novel strains, does not work with equal
-    equal       bool | str      default: False; if str, equal instances of each str will be in testing set, does not work with split_by
+    Splits a processed Polars DataFrame (rf_dat) into training and validation subsets.
+
+    This function supports three distinct splitting strategies to ensure robust 
+    model evaluation:
+    1. Random Split: Standard random sampling based on `test_frac`.
+    2. Category-based Split (split_by): Ensures specific groups (e.g., specific 
+       strains) are exclusively in either the training or testing set. This is 
+       essential for testing model generalization to novel groups.
+    3. Balanced Split (equal): Samples an equal number of instances from each 
+       category in the specified column for the test set.
+
+    Args:
+        rf_dat: The processed Polars DataFrame to split.
+        test_frac: The fraction of the dataset (0.0 to 1.0) to assign to the test set.
+        split_by: Column name to use for grouped splitting. Ensures all rows 
+            with the same value in this column stay together. Incompatible with `equal`.
+        equal: Column name to use for balanced test set sampling. Ensures 
+            equal representation of classes in the test set. Incompatible with `split_by`.
+
+    Returns:
+        A tuple containing (train_set, test_set) as Polars DataFrames.
+
+    Raises:
+        ValueError: If both `split_by` and `equal` are provided.
     """
 
     # general information for splitting

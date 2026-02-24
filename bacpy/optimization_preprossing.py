@@ -4,12 +4,12 @@ import polars as pl
 from itertools import product, repeat
 from multiprocessing import get_context
 from .preprocess_tecan import preprocess_platereader
-from .predictive_model import train_test_split, classifier_randomForest
+from .predictive_model import train_test_split, classifier_randomForest, BaseClassifier
 from time import strftime, gmtime
 from random import shuffle
 from sklearn import clone
 from ast import literal_eval
-
+from typing import Union, List, Optional, Dict
 
 
 # ~~~~~~~~ MODEL OPTIMIZATION ~~~~~~~~ #
@@ -38,19 +38,48 @@ def test_kwargs_platereader(kwargs, idx, kwargs_len, parsed_culture_collections,
         return pl.concat(stats_ls, how="vertical_relaxed").with_columns(pl.lit(str(kwargs)).alias("kwargs"))
 
 
-def optimize_preprocess_platereader(parsed, 
-                                    n_kwargs=-1, 
-                                    outlier_column = "strainID",
-                                    test_frac=0.2,
-                                    equal="strainID",
-                                    split_by=False,
-                                    model=classifier_randomForest(n_jobs=1, n_estimators=100),
-                                    on="strainID",
-                                    print_logs=False,
-                                    n_jobs=-1,
-                                    repeats=3,
-                                    filename=None,
-                                    ):
+def optimize_preprocess_platereader(
+                                        parsed: pl.DataFrame,
+                                        n_kwargs: int = -1,
+                                        outlier_column: str = "strainID",
+                                        test_frac: float = 0.2,
+                                        equal: Union[bool, str] = "strainID",
+                                        split_by: Union[bool, str] = False,
+                                        model: BaseClassifier = classifier_randomForest(n_jobs=1, n_estimators=100),
+                                        on: str = "strainID",
+                                        print_logs: bool = False,
+                                        n_jobs: int = -1,
+                                        repeats: int = 3,
+                                        filename: Optional[str] = None,
+                                   ) -> pl.DataFrame:
+    """
+    Performs a parameter grid search to find optimal preprocessing settings for plate reader data.
+
+    This function generates a grid of preprocessing parameters, 
+    subsets them if requested, and evaluates each combination in parallel. Each test 
+    involves preprocessing the data and training a model to evaluate accuracy or 
+    performance, averaged over multiple repeats to ensure robustness.
+
+    Args:
+        parsed: The raw parsed Polars DataFrame to be optimized.
+        n_kwargs: Number of random parameter combinations to test. If -1, performs 
+            a full grid search of the entire parameter space.
+        outlier_column: The column to use for grouping during outlier detection.
+        test_frac: The fraction of data to reserve for testing in each iteration.
+        equal: The column name to ensure balanced representation during data splitting.
+        split_by: Optional column name to define hard splits (e.g., by 'date' or 'plate').
+        model: The classifier instance (inheriting from BaseClassifier) used for evaluation.
+        on: The taxonomic rank or label column the model should predict.
+        print_logs: Internal logging toggle for the preprocessing sub-functions.
+        n_jobs: Number of CPU cores for parallel execution. Defaults to -1 (all cores).
+        repeats: Number of times to repeat each parameter test with different 
+            data splits to calculate average performance.
+        filename: Optional path to save the resulting optimization table as a .tsv file.
+
+    Returns:
+        A Polars DataFrame containing the tested parameter sets and their 
+        associated performance metrics.
+    """
     
     # handle multi core processing
     model.__setattr__("n_jobs", 1)
@@ -108,25 +137,28 @@ def optimize_preprocess_platereader(parsed,
     return test_df
 
 
-def preprocess_optimized(parsed, optimization_result):
+def preprocess_optimized(
+                            parsed: pl.DataFrame, 
+                            optimization_result: pl.DataFrame
+                        ) -> pl.DataFrame:
     """
-    Processes the parsed data using the optimized parameters.
+    Applies the best-performing parameters from an optimization run to a dataset.
 
-    This function extracts keyword arguments from an optimization result, 
-    enforces logging, and applies these settings to the raw parsed data 
-    via the underlying preprocessing utility.
+    This function acts as the bridge between the optimization search and the 
+    final production pipeline. It extracts the dictionary of 
+    parameters from the top-performing row of an optimization result and 
+    executes the `preprocess_platereader` pipeline.
 
     Args:
-        parsed (pl.DataFrame): The raw data structure containing 
-            parsed plate reader information.
-        optimization_result (pl.DataFrame): A collection containing 
-            optimization metadata, specifically requiring a "kwargs" key 
-            with a string-represented dictionary at index 0.
+        parsed: The raw parsed data to be processed.
+        optimization_result: A Polars DataFrame containing the results from 
+            `optimize_preprocess_platereader`. The first row is expected 
+            to contain the target configuration in the "kwargs" column.
 
     Returns:
-        DataFrame: The processed data (rf_dat_optimized) after applying 
-            the optimized configurations.
-        """
+        A wide-format Polars DataFrame (rf_dat) processed with optimized parameters, 
+        ready for training or final classification.
+    """
     kwargs = literal_eval(optimization_result["kwargs"][0])
     kwargs["print_logs"] = True
     rf_dat_optimized = preprocess_platereader(parsed, **kwargs)
