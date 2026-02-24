@@ -41,7 +41,7 @@ def parse_dataset_flowjo(mapping: str) -> pl.DataFrame:
             events = parse_file_flowjo(csv_path)
             events_ls.append(events)
         else:
-            raise ValueError(f"File does not exist: {filename}")
+            ValueError(f"File does not exist: {filename}")
 
     start = time.perf_counter()
     events_df = pl.concat(events_ls, how="diagonal_relaxed")
