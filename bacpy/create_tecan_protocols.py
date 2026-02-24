@@ -3,6 +3,7 @@
 # import modules
 import numpy as np
 import polars as pl
+from typing import Optional, Union, Dict
 
 # import scripts
 from .tecan_strings import icontrol_plate_range, icontrol_header_abs, icontrol_fluorescent_scan, icontrol_end
@@ -10,71 +11,48 @@ from .spark_strings import spark_header_abs, spark_fluorescence_scan, spark_end
 
 
 
-def create_tecan_scripts(features=None,
-                         device="icontrol",  # icontrol or spark
-                         outfile="tecan",
-                         n_features=-1,
-                        
-                         # less important parameters
-                         abs_nm=720,
-                         nm_interval=15,
-                         gain=100,
-                         zposition=20000,
-                         lagtime=0,
-                         integrationtime=20,
-                         numflashes=3,
-                         settletime=20,
-                         ):
+def create_tecan_scripts(
+                            features: Optional[Union[np.ndarray, Dict, pl.DataFrame]] = None,
+                            device: str = "icontrol",  # options: "icontrol" or "spark"
+                            outfile: str = "tecan",
+                            n_features: int = -1,
+                            abs_nm: int = 720,
+                            nm_interval: int = 15,
+                            gain: int = 100,
+                            zposition: int = 20000,
+                            lagtime: int = 0,
+                            integrationtime: int = 20,
+                            numflashes: int = 3,
+                            settletime: int = 20,
+                        ) -> None:
     """
-    function to create the configuration files for tecan plate readers.
-    As of know, Tecan iControl and Tecan Spark software is supported
-    ----
-    Parameter:
-        features        (numpy.ndarray | dict | polars.DataFrame): 
-                        default = None; creates a full scan with nm_interval
-                        list of features that one wishes to be scanned. 
-                            numpy.ndarray should only contain excitation wavelengths; the script will produce a full excitation scan with an offset of 45nm
-                                i.e. if one of ex-wv is 300, the corresponding emission scan will cover 345 --> 840nm
-                            dict contains the desired excitation wave-lengths as keys & the starting emission wavelength as value
-                                i.e. a dict with features[500] = 550 will produce a script that uses 500nm as excitation wavelength, where the emission scan reaches from 550 --> 840nm
-                                alternatively, the values can be lists, that denote the starting and endling emission wavelength
-                                 i.e. features[450] = [550, 600] produces a script that excites with 450 nm and records the emission from 550 --> 600nm
-                            polars.DataFrame should be obtained from bacpy.randomForest.get_features_importances(), the function aggregates the feature importances 
-                                by excitation wavelength uses those features to create an emission scan that goes from em.min() to em.max(); if there are less than 5 emission
-                                wavelengths, the emission spectra will be appended to allow for normalization of the downstream data using z-score transformation | area-under-curve normalization
-        device          (str): 
-                        default = "icontrol"
-                        options are "icontrol" or "spark" xml-type of files
-        outfile         (str): 
-                        default = "tecan"
-                        name for the output file. the respective extension is added automatically
-        n_features      (int)
-                        default=-1
-                        only works with features=pl.DataFrame; determines the number of top-most important features to consider before aggregation of excitation wavelength importances
-        abs_nm          (int)
-                        default=720
-                        determines which wvelength should be used for optical density measurements. These measurements are always performed at the start & end of the measurement
-        nm_interval     (int)
-                        default=15
-                        determines the intervals in nano-meter in step-size of the emission scan. Lower numbers provide more measurements but scanning takes longer
-        gain            (int)
-                        default=100
-                        the gain (amplicification) of the measured response; 100 is the default and we never changed it
-        zposition       (int)
-                        default=20000
-                        zposition, i.e. the distance of the detector from ther 96-well plate during emission measurement. 20000 is the default and we never changed it
-        lagtime         (int)
-                        default=0
-                        time to pass between excitation and fluorescent measurement. I suppose this is important for FRAT-FlIM experiments, so we always set it to 0
-        integrationtime (int)
-                        default=20
-                        Length of the detection of the emission response. Tecan's default is 20ms and we never changed that
-        numflashes      (int)
-                        default=3
-                        number of repeated measurements of the same well using the same ex-em combination. Higher numbers give more accurate values but increase the time of the measurement. Low numbers DO NOT severly impact accuracy
-        settletime      (int)
-                        default=20
-                        time in Milli-seconds (ms) the tecan waits after moving the plate to let cells settle. Tecan's default is 20ms and we never changed that
+    Generates configuration files (.mth or .xml) for Tecan plate readers.
+
+    This utility converts desired spectral features into structured scan protocols. 
+    It supports full scans, specific wavelength pairs, or optimized protocols 
+    derived from model feature importances.
+
+    Args:
+        features: Input determining the scan range.
+            - None: Full scan (240-810nm).
+            - np.ndarray: List of excitation wavelengths; emission starts at ex+45nm.
+            - dict: {ex: start_em} or {ex: [start_em, end_em]}.
+            - pl.DataFrame: Feature importance table; automatically creates 
+              clustered emission scans for top important wavelengths.
+        device: The target software format ('icontrol' or 'spark').
+        outfile: Output filename (extension added automatically).
+        n_features: Number of top features to use if providing a DataFrame.
+        abs_nm: Wavelength for OD/Absorbance measurements (usually 600 or 720nm).
+        nm_interval: Step size for emission scans (default 15nm).
+        gain: Detector amplification (default 100).
+        zposition: Vertical distance of detector from plate (default 20000).
+        lagtime: Time delay between flash and measurement (default 0ms).
+        integrationtime: Measurement duration per flash (default 20ms).
+        numflashes: Number of flashes averaged per well (default 3).
+        settletime: Delay after plate movement to reduce liquid vibration (default 20ms).
+
+    Returns:
+        None. Writes the script file to the local directory.
     """
     if features is None:
         features = np.arange(240, 810+1, nm_interval)

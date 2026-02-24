@@ -18,7 +18,7 @@ import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 from sklearn.preprocessing import StandardScaler
 from matplotlib.ticker import FuncFormatter
-from typing import Dict, Union, Optional, Tuple
+from typing import Dict, Union, Optional, Tuple, List
 
 # load bacpy modules
 from .taxonomy import taxonomy_df
@@ -558,12 +558,36 @@ def plot_feature_importances(
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~ CUMULATIVE FEATURE IMPORTANCE ~~~~~~~~~~~~~~~~~~~~~~~~~ #
-def plot_cumulative_importance(feature_importances,
-                               aggregate=True,
-                               cutoff=False,
-                               figure_name="cumulative_importance",
-                               figsize=(8,5),
-                               ):
+def plot_cumulative_importance(
+                                feature_importances: pl.DataFrame,
+                                aggregate: bool = True,
+                                cutoff: Union[bool, float, int] = False,
+                                figure_name: str = "cumulative_importance",
+                                figsize: Tuple[int, int] = (8, 5),
+                              ) -> None:
+    """
+    Plots cumulative feature importances.
+
+    This function ranks features by their importance and plots a dual-axis chart: 
+    a bar chart for individual importance and a line plot for cumulative 
+    importance. It can aggregate by excitation wavelength to show which spectral 
+    regions contribute most to the total signal.
+
+    Args:
+        feature_importances: Polars DataFrame containing 'ex' and 'importance' 
+            columns, or 'feature' and 'importance'.
+        aggregate: If True, sums importances by excitation wavelength ('ex'). 
+            If False, plots individual features.
+        cutoff: Optional threshold to visualize a selection limit.
+            - float: The cumulative importance percentage (e.g., 0.8 for 80%).
+            - int: The top N number of features to keep.
+            - False: Disables cutoff visualization.
+        figure_name: Base filename for saving (.png, .pdf, .svg).
+        figsize: A tuple defining width and height in inches.
+
+    Returns:
+        None. Saves the high-resolution dual-axis plot to disk.
+    """
     
     # plot cummulative feature importances (ex)
     if aggregate:
@@ -666,19 +690,35 @@ def plot_cumulative_importance(feature_importances,
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~ Wavelengths ~~~~~~~~~~~~~~~~~~~~~~~~~ #
-def plot_fluorescent_response(rf_dat,
-                              excitation_wavelength=345, 
-                              color_by="strainID",
-                              palette=None,
-                              figure_name="fluorescent_response",
-                              figsize=(8,5),
-                              ):
+def plot_fluorescent_response(
+                                rf_dat: pl.DataFrame,
+                                excitation_wavelength: int = 345, 
+                                color_by: str = "strainID",
+                                palette: Optional[str] = None,
+                                figure_name: str = "fluorescent_response",
+                                figsize: Tuple[int, int] = (8, 5),
+                             ) -> None:
     """
-    funcion to plot fluorescent responses
-    rf_dat                  pl.DataFrame            processed data ran through bacpy.preprocess_data
-    excitation_wavelength   int                     default=345, which excitation wavelength to plot
-    color_by                str                     default="strainID", color responses according to
-    figure_name             str                     default="fluorescent_response", name of file to be written  
+    Plots the emission spectra for a specific excitation wavelength.
+
+    This function filters the wide-format processed data for all features 
+    associated with a single excitation wavelength, unpivots them, and 
+    visualizes the fluorescent response as line plots. This is useful for 
+    comparing spectral fingerprints across different strains or conditions.
+
+    Args:
+        rf_dat: The processed wide-format Polars DataFrame.
+        excitation_wavelength: The specific excitation wavelength (nm) to 
+            extract from the features (e.g., 345).
+        color_by: The column name used to group and color the lines 
+            (e.g., "strainID", "medium").
+        palette: Optional color palette for the plot (Seaborn palette name 
+            or list of colors).
+        figure_name: Base filename for saving results (.png, .pdf, .svg).
+        figsize: A tuple defining width and height in inches.
+
+    Returns:
+        None. Saves the high-resolution spectral plot to disk.
     """
                         
     # show the responses
@@ -742,33 +782,48 @@ def plot_fluorescent_response(rf_dat,
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~ PCA ~~~~~~~~~~~~~~~~~~~~~~~~~ #
 def plot_dimensional_reduction(
-                               rf_dat,
-                               color_by        = False,
-                               centroid_lines  = False,
-                               method          = "pca",
-                               distance        = "braycurtis",
-                               kernel          = "linear",
-                               perplexity      = False,
-                               scale           = True,
-                               components      = ["PC1", "PC2"],
-                               alpha           = 0.5,
-                               color_map       = "tab20",
-                               n_jobs          = -1,
-                               figure_name     = "dimensional_reduction",
-                               figsize         = (10, 10),
-                               ):
+                                rf_dat: pl.DataFrame,
+                                color_by: Union[bool, str] = False,
+                                centroid_lines: bool = False,
+                                method: str = "pca",
+                                distance: str = "braycurtis",
+                                kernel: str = "linear",
+                                perplexity: Union[bool, int] = False,
+                                scale: bool = True,
+                                components: List[str] = ["PC1", "PC2"],
+                                alpha: float = 0.5,
+                                color_map: Union[str, dict] = "tab20",
+                                n_jobs: int = -1,
+                                figure_name: str = "dimensional_reduction",
+                                figsize: Tuple[int, int] = (10, 10),
+                              ) -> None:
     """
-    function to perform dimensional reduction of processed features
-    rf_dat          pl.DataFrame            processed data ran through bacpy.preprocess_data
-    color_by        bool | str              default=False, color points according to feature in metadata
-    centroid_line   bool | str              default=False, calculate & plot centroids for differently colored data-points
-    method          str                     default="pca", which method to use, options are: pca | mds | tnse
-    distance        str                     default="braycurtis", method to use to calculate distance
-    kernel          str                     default="linear" kernel to use for pca
-    components      list                    default=["PC1", "PC2"], which components to plot
-    color_map       str                     default="tab20", which color map to use for color_by
-    n_jobs          int                     default=-1, how many jobs to compute dimensional reduction
-    figure_name     str                     default="dimensional_reduction", name of figure written to drive
+    Performs dimensionality reduction and visualizes clusters in 2D space.
+
+    Supports PCA (Kernel), MDS, and t-SNE. This utility helps identify 
+    natural groupings in the spectral data and assess how well different 
+    strains or conditions are separated before training a model.
+
+    Args:
+        rf_dat: The processed wide-format Polars DataFrame.
+        color_by: Column name to use for coloring data points (e.g., "strainID").
+        centroid_lines: If True, draws lines connecting each point to its 
+            group centroid, emphasizing cluster spread.
+        method: Dimensionality reduction algorithm: 'pca', 'mds', or 'tsne'.
+        distance: Metric for distance calculation (e.g., 'braycurtis', 'euclidean').
+        kernel: Kernel for PCA (e.g., 'linear', 'rbf').
+        perplexity: The perplexity parameter for t-SNE. If False, defaults to 
+            sqrt(n_samples).
+        scale: If True, applies StandardScaler to features before reduction.
+        components: List of two component names to plot (e.g., ["PC1", "PC2"]).
+        alpha: Transparency of the data points.
+        color_map: Name of Matplotlib palette or a dictionary mapping labels to colors.
+        n_jobs: Number of parallel jobs for distance and reduction calculations.
+        figure_name: Base filename for saving results (.png, .pdf, .svg).
+        figsize: A tuple defining width and height in inches.
+
+    Returns:
+        None. Saves the high-resolution reduction plot to disk.
     """
 
     # perform the split
@@ -915,13 +970,32 @@ def plot_dimensional_reduction(
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~ CLUSTERMAP ~~~~~~~~~~~~~~~~~~~~~~~~~ #
-def plot_heatmap(rf_dat,
-                 annotation = False,
-                 color_map = "tab20",
-                 figure_name = "heatmap",
-                 figsize=(16, 10),
-                 ):
-    
+def plot_heatmap(
+                    rf_dat: pl.DataFrame,
+                    annotation: Union[bool, str] = False,
+                    color_map: str = "tab20",
+                    figure_name: str = "heatmap",
+                    figsize: Tuple[int, int] = (16, 10),
+                ) -> None:
+    """
+    Generates a hierarchical clustered heatmap of features across all samples.
+
+    The rows (samples) and columns (wavelengths) are reordered using hierarchical 
+    clustering to bring similar profiles together. If an annotation is provided, 
+    a color-coded sidebar identifies the taxonomic groups for each row.
+
+    Args:
+        rf_dat: The processed wide-format Polars DataFrame.
+        annotation: Column name to use for row-wise color labeling (e.g., "family").
+            If False, no color bar is added.
+        color_map: Name of the Matplotlib palette for the annotation sidebar.
+        figure_name: Base filename for saving results (.png, .pdf, .svg).
+        figsize: A tuple defining width and height in inches.
+
+    Returns:
+        None. Saves the high-resolution clustermap to disk.
+    """
+
     # perform the split
     feature_df, metadata = _feature_metadata_split(rf_dat)
     feature_df = feature_df.to_pandas()
