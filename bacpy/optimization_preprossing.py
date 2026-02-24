@@ -108,8 +108,25 @@ def optimize_preprocess_platereader(parsed,
     return test_df
 
 
-
 def preprocess_optimized(parsed, optimization_result):
+    """
+    Processes the parsed data using the optimized parameters.
+
+    This function extracts keyword arguments from an optimization result, 
+    enforces logging, and applies these settings to the raw parsed data 
+    via the underlying preprocessing utility.
+
+    Args:
+        parsed (pl.DataFrame): The raw data structure containing 
+            parsed plate reader information.
+        optimization_result (pl.DataFrame): A collection containing 
+            optimization metadata, specifically requiring a "kwargs" key 
+            with a string-represented dictionary at index 0.
+
+    Returns:
+        DataFrame: The processed data (rf_dat_optimized) after applying 
+            the optimized configurations.
+        """
     kwargs = literal_eval(optimization_result["kwargs"][0])
     kwargs["print_logs"] = True
     rf_dat_optimized = preprocess_platereader(parsed, **kwargs)
