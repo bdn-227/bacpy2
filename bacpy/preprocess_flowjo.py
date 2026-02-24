@@ -1,4 +1,5 @@
-
+from typing import Union, Optional
+import polars as pl
 
 def print_text(log_text, print_logs=False):
     if print_logs:
@@ -6,15 +7,43 @@ def print_text(log_text, print_logs=False):
 
 
 # preprocess function
-def preprocess_cytometry(events_df,
-                         arcsinh = False,
-                         normalize_by = "scale_ex",
-                         impute_strategy = "mean",
-                         outlier_threshold = False,
-                         multicore=True,
-                         print_logs = True,
-                         return_after = False,
-                         ):
+def preprocess_cytometry(
+                            events_df: pl.DataFrame,
+                            arcsinh: bool = False,
+                            normalize_by: Union[str, bool] = "scale_ex",
+                            impute_strategy: Union[str, bool] = "mean",
+                            multicore: bool = True,
+                            print_logs: bool = True,
+                        ) -> pl.DataFrame:
+    """
+    Preprocesses flow cytometry data including transformation, normalization, and imputation.
+
+    This function provides a pipeline for cleaning and scaling event data. It handles 
+    non-linear transformations, multiple Z-score normalization strategies, 
+    and handles missing values resulting from these operations.
+
+    Args:
+        events_df: Input data containing cytometry events.
+        arcsinh: If True, performs an inverse arcsinh transformation on the data 
+            to compress high-dynamic-range signals.
+        normalize_by: Normalization strategy to apply. 
+            - "scale": Applies a global z-score.
+            - "scale_ex": Groups by excitation wavelength prior to z-score.
+            - "scale_ex_em": Groups by both excitation and emission prior to z-score.
+            - False: Skips normalization.
+        impute_strategy: Strategy to fill null values arising after normalization.
+            - "mean": Fills with the column average.
+            - "min": Fills with the column minimum.
+            - "max": Fills with the column maximum.
+            - "high_val": Fills with 1e10 as a placeholder.
+            - "zero": Fills with 0.
+            - False: Skips imputation.
+        multicore: If True, utilizes multiple CPU cores for processing (where applicable).
+        print_logs: If True, prints status messages and progress to the console.
+
+    Returns:
+        The processed cytometry data as a Polars DataFrame.
+    """
     
     # handling imports
     if not multicore:
