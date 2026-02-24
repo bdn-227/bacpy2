@@ -13,10 +13,20 @@ def chunk_list(lst, n):
         yield lst[i:i + n]
 
 
-def parse_file_evoware(asc_path):
+def parse_file_evoware(asc_path: str) -> pl.DataFrame:
     """
-    wrapper function to correctly parse ascii files generated from TECAN-evoware
-    asc_file    determines which input ascii file should be parsed, must end with .asc
+    Wrapper function to correctly parse ASCII files generated from TECAN-evoware.
+
+    This function handles the specific formatting and metadata structure of 
+    Tecan Evoware .asc exports, converting the raw text data into a structured 
+    Polars format.
+
+    Args:
+        asc_path: The file path to the input ASCII file. Must end with '.asc'.
+
+    Returns:
+        A Polars DataFrame containing the parsed data from the file.
+
     """
 
     # the the file name
@@ -44,7 +54,6 @@ def parse_file_evoware(asc_path):
 
         return parsed_data
 
-    
     # or maybe not lol
     else:
         raise ValueError(f"make sure to provide a valid ascii file ending in .asc")

@@ -210,11 +210,29 @@ def parse_kinetic_chunk(chunk, all_wells, metadata):
 
 
 
-def parse_file_icontrol(excel_path):
+def parse_file_icontrol(excel_path: str) -> pl.DataFrame:
     """
-    function to parse excel files containg spectra information obtained using the
-    TECAN iControl software
-    excel_path:     str     path to an excel file created by TECAN iControl
+    Parses Tecan iControl and Spark Excel files containing spectral information.
+
+    This function iterates through all sheets in a workbook, identifies the software 
+    origin (Spark vs. iControl), detects measurement modes (Kinetic vs. Endpoint), 
+    and segments the raw sheet data into logical chunks based on "Label" and 
+    "End Time" markers. It then flattens these chunks into a tidy long-format 
+    Polars DataFrame.
+
+    Args:
+        excel_path: The file path to the Excel workbook created by 
+            TECAN iControl or Spark software.
+
+    Returns:
+        A consolidated Polars DataFrame containing processed measurements from 
+        all valid sheets. Includes metadata such as device ID, excitation/emission 
+        wavelengths, temperature, and well coordinates.
+
+    Note:
+        - Uses 'xlsx2csv' engine for high-performance Excel reading.
+        - Automatically skips empty sheets or sheets that fail to parse.
+        - Dynamically generates 96-well (or larger) coordinate maps for data alignment.
     """
     # first, determine which books to read
     workbook = load_workbook(excel_path, read_only=True)

@@ -16,33 +16,39 @@ def preprocess_cytometry(
                             print_logs: bool = True,
                         ) -> pl.DataFrame:
     """
-    Preprocesses flow cytometry data including transformation, normalization, and imputation.
+    Executes a comprehensive preprocessing pipeline on cytometry event data.
 
-    This function provides a pipeline for cleaning and scaling event data. It handles 
-    non-linear transformations, multiple Z-score normalization strategies, 
-    and handles missing values resulting from these operations.
+    The function processes data per-file to maintain memory efficiency, involving 
+    unpivoting wide-format feature data into a long-format 'response' column, 
+    applying optional transformations and Z-score normalizations, and finally 
+    re-pivoting and imputing missing values.
 
     Args:
-        events_df: Input data containing cytometry events.
-        arcsinh: If True, performs an inverse arcsinh transformation on the data 
-            to compress high-dynamic-range signals.
-        normalize_by: Normalization strategy to apply. 
-            - "scale": Applies a global z-score.
-            - "scale_ex": Groups by excitation wavelength prior to z-score.
-            - "scale_ex_em": Groups by both excitation and emission prior to z-score.
+        events_df: The input Polars DataFrame containing cytometry events and metadata.
+        arcsinh: If True, applies an inverse hyperbolic sine transformation to 
+            the 'response' values to handle high dynamic range and skewness.
+        normalize_by: The Z-score normalization strategy:
+            - "scale": Standardizes by filename and event.
+            - "scale_ex": Extracts excitation from feature names and standardizes.
+            - "scale_ex_em": Extracts both excitation and emission for grouping.
             - False: Skips normalization.
-        impute_strategy: Strategy to fill null values arising after normalization.
-            - "mean": Fills with the column average.
-            - "min": Fills with the column minimum.
-            - "max": Fills with the column maximum.
-            - "high_val": Fills with 1e10 as a placeholder.
+        impute_strategy: Logic for handling nulls after re-pivoting:
+            - "mean"/"min"/"max": Based on horizontal statistics across features.
+            - "high_val": Fills with 1e6.
             - "zero": Fills with 0.
-            - False: Skips imputation.
-        multicore: If True, utilizes multiple CPU cores for processing (where applicable).
-        print_logs: If True, prints status messages and progress to the console.
+            - False: Drops columns containing any null values.
+        multicore: If False, restricts Polars to a single thread by setting 
+            POLARS_MAX_THREADS to "1".
+        print_logs: If True, utilizes a partial print function to output 
+            step-wise progress percentages to the console.
 
     Returns:
-        The processed cytometry data as a Polars DataFrame.
+        A wide-format Polars DataFrame with transformed and cleaned features.
+
+    Note:
+        This function performs an 'unpivot' (melt) followed by a 'pivot' operation 
+        inside the file loop, which is standard for applying column-dependent 
+        normalizations across disparate signal channels.
     """
     
     # handling imports

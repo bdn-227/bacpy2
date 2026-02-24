@@ -12,7 +12,23 @@ cols = ['fsc', 'ssc', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10
         'short_axis_moment', 'size', 'total_intensity', 'time']
 
 
-def parse_file_flowjo(csv_path):
+def parse_file_flowjo(csv_path: str) -> pl.DataFrame:
+    """
+    Parses a FlowJo-exported CSV file into a structured Polars DataFrame.
+
+    The function standardizes column names to lowercase snake_case, filters 
+    for specific signal columns, and adds metadata for event indexing and 
+    source identification.
+
+    Args:
+        csv_path: The file path to the FlowJo CSV export.
+
+    Returns:
+        A Polars DataFrame containing the cleaned events, a unique event 
+        index, and the source filename.
+
+    """
+
     filename = os.path.basename(csv_path)
     events = pl.read_csv(f"{csv_path}")
     events = (events

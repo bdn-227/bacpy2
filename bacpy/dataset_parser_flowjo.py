@@ -3,7 +3,27 @@ import os
 import polars as pl
 import time
 
-def parse_dataset_flowjo(mapping):
+def parse_dataset_flowjo(mapping: str) -> pl.DataFrame:
+    """
+    Parses a collection of FlowJo CSV exports based on a mapping file.
+
+    This function reads a mapping file (Excel, ODS, TSV, or CSV) to identify 
+    target filenames within the same directory. It iteratively parses each 
+    file, concatenates the results, removes rows with null features, and 
+    joins the event data back to the original mapping metadata.
+
+    Args:
+        mapping: Path to the mapping file. Supported formats are .xlsx, 
+            .ods, .tsv, and .csv. The file must contain a 'filename' column.
+
+    Returns:
+        A consolidated Polars DataFrame in long format, joined with 
+        mapping metadata.
+
+    Raises:
+        ValueError: If a filename specified in the mapping file cannot 
+            be found in the directory.
+    """
     data_path = os.path.dirname(mapping)
     if mapping.endswith(".xlsx") or mapping.endswith(".ods"):
         mapping = pl.read_excel(mapping)
@@ -21,7 +41,7 @@ def parse_dataset_flowjo(mapping):
             events = parse_file_flowjo(csv_path)
             events_ls.append(events)
         else:
-            ValueError(f"File does not exist: " + filename)
+            raise ValueError(f"File does not exist: {filename}")
 
     start = time.perf_counter()
     events_df = pl.concat(events_ls, how="diagonal_relaxed")

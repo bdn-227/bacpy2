@@ -1,4 +1,6 @@
-
+import polars as pl
+import numpy as np
+from typing import Union, List, Optional
 
 
 
@@ -100,91 +102,62 @@ def impute(rf_dat, indexcols, impute_strategy, print_func, pl):
 
 
 # preprocess function
-def preprocess_platereader(parsed_data,
-                           feature_list = False,
-                           filter_common_features = False,
-                           include_negative = False,
-                           include_over = False,
-                           scale_by_medium = False,
-                           arcsinh = False,
-                           normalize_by = "scale_ex",
-                           impute_strategy = "mean",
-                           batches = ["device", "date"],
-                           add_od = False,
-                           outlier_threshold = False,
-                           outlier_column = "strainID",
-                           multicore=True,
-                           print_logs = True,
-                           return_after = False,
-                          ):
+def preprocess_platereader(
+                            parsed_data: pl.DataFrame,
+                            feature_list: Union[List[str], np.ndarray, bool] = False,
+                            filter_common_features: bool = False,
+                            include_negative: bool = False,
+                            include_over: bool = False,
+                            scale_by_medium: Union[bool, str] = False,
+                            arcsinh: bool = False,
+                            normalize_by: Union[str, bool] = "scale_ex",
+                            impute_strategy: Union[str, bool] = "mean",
+                            batches: Union[List[str], bool] = ["device", "date"],
+                            add_od: bool = False,
+                            outlier_threshold: Union[bool, int] = False,
+                            outlier_column: str = "strainID",
+                            multicore: bool = True,
+                            print_logs: bool = True,
+                            return_after: Union[bool, str] = False,
+                          ) -> pl.DataFrame:
     """
-    Processing function to convert spectral data into a matrix-like 
-    polars DataFrame usable for machine learning
+    Converts raw spectral plate reader data into a clean feature matrix for machine learning.
 
-    Parameters
-    ----------
-    parsed_data : pl.DataFrame
-        Dataframe that has been parsed before. Raw tecan output is not accepted.
-        Required columns are ["filename", "date", "device", "well", "measurement_mode", "ex", "em", "ex_em", "response"]
-    
-    feature_list : list or array-like --> False
-        list or array containing features. ex_em column will be subsetted with these
-    
-    filter_common_features : bool --> False
-        Filter the features of the input based on intersections (recommended when different tecan-scripts have been used)
-    
-    include_negative : bool --> False
-        include negative fluorescent responses
-    
-    include_over : bool --> False
-        include fluorescent responses the exceed linear range of detector
-    
-    scale_by_medium : bool | str --> False
-        "measured" medium measurements are available
-        "estimated" to estimate what is medium and use for normalization
-        False to not perform at all
-        background removal by performing z-score transformation of data using medium measurements. 
-        Highly recommended, but only works if there is at least one medium-well per plate
-    
-    normalize_by : str | bool --> "scale_ex"
-        Options are: False, "scale", "scale_ex", "auc"
-        Way of normalizing the data. False means data will not be normalized
-    
-    impute_strategy : str | bool --> "mean"
-        During normalizaion and filtering some values but not whole features can get lost.
-        The inpute_strategy defines how these missing values are being treated.
-        Values are either replaced with mean, median, max, min, zero or high_val (1e10).
-        False removes all incomplete features
-    
-    arcsinh : bool --> False
-        hyperbolic acr-sinus transformation of normalized fluorescent fingerprints.
-        Might make data for accessible for batch-effect corrections.
-    
-    batches : list --> ["device", "date"]
-        Perform batch effect correction using ComBat function.
-    
-    renorm : bool --> False
-        perform renormalization after batch-effect removal
-    
-    add_od : bool --> False
-        should the final output contain optical denstiy data?
-    
-    outlier_threshold : bool | int --> False
-        remove outliers from the data (only do for training data!!!).
-        Data will be projected into low-dimensional space using PCA.
-        Samples are filtered to have a z-score in the lower-dimension space < outlier_threshold
-        !!! Requires strainID column to be present !!!
-    
-    print_logs : bool --> True
-        Set true if progress should be printed into terminal
-    
-    return_after : bool | str --> False
-        Return intermediate data frame step. Only for debugging
-        
-    Returns
-    -------
-    rf_dat : pl.DataFrame
-        processed data ready for classification
+    This pipeline handles the transition from a 'long' observation format to a 'wide' 
+    feature format. It includes specialized steps for biological data such as 
+    background subtraction (using measured or estimated medium scattering), batch effect 
+    correction via the ComBat algorithm, and PCA-based outlier filtering.
+
+    Args:
+        parsed_data: Input Polars DataFrame. Required columns: ["filename", "date", 
+            "device", "well", "measurement_mode", "ex", "em", "ex_em", "response"].
+        feature_list: Specific 'ex_em' features to keep. Accepts a list of strings, 
+            a NumPy array, or False to keep all features.
+        filter_common_features: If True, only keeps features present in every 
+            filename (intersection).
+        include_negative: If False, filters out negative fluorescence responses.
+        include_over: If False, removes 'OVER' values (saturated detector signals).
+        scale_by_medium: Background removal strategy.
+            - "measured": Uses wells labeled 'medium'.
+            - "estimated": Uses the lowest 5% quantile of absorbance as medium.
+            - False: No background subtraction.
+        arcsinh: If True, applies inverse hyperbolic sine transformation.
+        normalize_by: Normalization method ("scale", "scale_ex", "auc", or False).
+        impute_strategy: Logic for filling missing values ("mean", "min", etc.).
+        batches: Columns to use for ComBat batch effect correction. Accepts a list 
+            of column names or False to skip batch correction.
+        add_od: If True, appends optical density (absorbance) data to the features.
+        outlier_threshold: Z-score threshold for PCA-based outlier removal per strain. 
+            Accepts an integer threshold or False to skip.
+        outlier_column: The column used to group data for outlier detection.
+        multicore: If False, restricts Polars to single-threaded execution.
+        print_logs: If True, prints verbose progress and data shape updates.
+        return_after: Debugging flag to return data early at specific steps 
+            (e.g., "pivot", "impute", "batch").
+
+    Returns:
+        A wide-format Polars DataFrame ready for classification, or a dictionary 
+        of dataframes if returning prematurely for debugging.
     """
     # handling imports
     if not multicore:

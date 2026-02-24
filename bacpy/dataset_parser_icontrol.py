@@ -13,12 +13,32 @@ from .file_parser_icontrol import parse_file_icontrol
 
 
 # now building the wrapper function to parse a whole evoware dataset
-def parse_dataset_icontrol(mapping=None, n_jobs=-1):
+def parse_dataset_icontrol(mapping: str, 
+                           n_jobs: int = -1) -> pl.DataFrame:
     """
-    function to parse a TECAN evoware dataset to obtain a neatly formatted dataframe (long format)
-    layout:     str     REQUIRED: path to the layout file:  **plates  <-->  hotel**
-    mapping:    str     OPTIONAL: mapping-file:             **strains <-->  wells**
-    n_jobs:     int     number of threads: defaults to -1, which means using all cores of the machine 
+    Orchestrates parallel parsing of TECAN iControl Excel files in a directory.
+
+    This wrapper identifies all valid measurement files in the directory associated 
+    with the mapping file, processes them in parallel using a multiprocessing pool, 
+    and consolidates the results. It also performs metadata cleaning, such as 
+    renaming 'ID' to 'strainID', standardizing column casing, and joining 
+    experimental metadata onto the measurement data.
+
+    Args:
+        mapping: Path to the mapping/metadata file. The parent directory of this 
+            file is used as the search path for .xlsx data files.
+        n_jobs: Number of CPU cores to use for parallel parsing. Defaults to -1 
+            (uses all available cores).
+
+    Returns:
+        A long-format Polars DataFrame containing measurements from all 
+        discovered files, enriched with metadata from the mapping table.
+
+    Note:
+        - Files containing 'layout', 'mapping', or starting with '.' are excluded.
+        - The mapping table is limited to a maximum of 96 entries.
+        - Parallelism is implemented using the 'spawn' context for cross-platform 
+          compatibility.
     """
 
     # read the inputs

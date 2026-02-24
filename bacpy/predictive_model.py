@@ -1,5 +1,5 @@
 # import libraries
-from abc import ABC
+from abc import ABC, abstractmethod
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from xgboost.sklearn import XGBClassifier
@@ -16,18 +16,39 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.multioutput import MultiOutputClassifier
 from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
+from typing import Optional, List, Union, Dict, Tuple
 
 
 
 class BaseClassifier(ABC):
+    """
+    Abstract Base Class for taxonomic classification of spectral data.
+
+    This class provides a standardized interface for training, predicting, 
+    and evaluating models on bacterial datasets. It includes automated 
+    feature/label detection, confidence-based classification, and tools 
+    for spectral feature importance analysis.
+    """
+
+    @abstractmethod
     def __init__(self):
         pass
 
-    # train method
-    def train(self, train_set, predict=None):
+    def train(self, 
+              train_set: pl.DataFrame, 
+              predict: Optional[List[str]] = None
+              ) -> None:
         """
-        function to train the model
-        train_set   pl.DataFrame    obtained using bacpy.preprocess_data and/or bacpy.train_test_split
+        Trains the model on a provided dataset with automated label encoding.
+
+        Detects features (starting with 'wv' or 'od') and taxonomic labels. 
+        If the model type is a Neural Network or XGBoost, it automatically 
+        applies and stores LabelEncoders for each taxonomic rank.
+
+        Args:
+            train_set: Polars DataFrame containing features and taxonomic metadata.
+            predict: Optional list of specific taxonomic levels to train on 
+                (e.g., ["genus", "strainID"]). If None, trains on all available.
         """
 
         # get the set of features & labels
@@ -107,15 +128,22 @@ class BaseClassifier(ABC):
 
 
     def predict_strains(self, 
-                        test_set,
-                        confidence=0):
+                        test_set: pl.DataFrame, 
+                        confidence: float = 0.0
+                        ) -> pl.DataFrame:
         """
-        function to predict the taxonomy of bacterial spectra
-        test_set            pl.DataFrame    a dataframe containing feautres (generated with bacpy.preprocess_data)
-        probability         bool            default: False; uses class probability and a look-up table for more precise predictions at the cost of computing speed
-        predict_all_ranks   bool            default: False; if True, use class probability to predict all taxonomic ranks that were present in training data
-        
-        returns:            pl.DataFrame    containing predictions
+        Predicts the taxonomy of bacterial spectra with optional confidence filtering.
+
+        Standardizes the input features (adding missing columns as zeros) and 
+        returns a DataFrame containing original metadata joined with predictions.
+
+        Args:
+            test_set: Polars DataFrame containing features.
+            confidence: Probability threshold (0-1). Classes falling below this 
+                threshold are labeled as "UNCLASSIFIED".
+
+        Returns:
+            A Polars DataFrame containing metadata and taxonomic predictions.
         """
 
         # add missing columns
@@ -152,17 +180,24 @@ class BaseClassifier(ABC):
 
 
     def evaluate(self, 
-                 validation_set, 
-                 confidence=0,
-                 metric="cm", # cm | stats | both
-                 average="weighted",
-                 ):
+                 validation_set: pl.DataFrame, 
+                 confidence: float = 0.0, 
+                 metric: str = "cm", 
+                 average: str = "weighted"
+                ) -> Union[Dict[str, pl.DataFrame], pl.DataFrame, Tuple[pl.DataFrame, Dict[str, pl.DataFrame]]]:
         """
-        function to perform evaluation of the model
-        validation_set      pl.DataFrame    validation dataset obtained using bacpy.preprocess_data, must contain the same taxonomic labels as training data
-        probability         bool            using probability-predictions and look-up for evaluation
-        predict_all_ranks   bool            predict all possible taxonomic ranks or just confident ones
-        metric              str             either: cm | stats | both determines which statistics should be returned
+        Evaluates model performance against a labeled validation dataset.
+
+        Args:
+            validation_set: Labeled Polars DataFrame for validation.
+            confidence: Confidence threshold for predictions.
+            metric: Type of output: "cm" (Confusion Matrix), "stats" (F1/Accuracy/MCC), 
+                or "both".
+            average: Averaging method for F1 score calculation.
+
+        Returns:
+            Depending on 'metric': A dictionary of confusion matrices, a 
+            statistics DataFrame, or a tuple containing both.
         """
 
         # subset the relevant columns for predictions & extract metadata
@@ -250,14 +285,25 @@ class BaseClassifier(ABC):
 
 
 
-    def get_features_importances(self, as_matrix=False):
+    def get_features_importances(self,
+                                 as_matrix: bool = False
+                                 ) -> pl.DataFrame:
         """
-        function to retrieve the feature importances of the model
-        as_matrix  bool    default: False; return feature importances as matrix instead of table
+        Retrieves and reformats feature importance scores.
+
+        Parses the internal 'ex_em' strings (e.g., 'wv488.530') into structured 
+        excitation and emission columns for analysis.
+
+        Args:
+            as_matrix: If True, pivots the results into a 2D matrix (Ex vs Em) 
+                suitable for heatmaps.
+
+        Returns:
+            A Polars DataFrame containing feature importance scores.
         """
 
         if self.model_type == "multi_svc":
-            ValueError(f"MULTI-OUTPUT SVM DOES NOT ALLOW FOR DETERMINATION OF FEATURE IMPORTANCES..")
+            raise ValueError(f"MULTI-OUTPUT SVM DOES NOT ALLOW FOR DETERMINATION OF FEATURE IMPORTANCES..")
 
         # extract the information
         importances = self.feature_importances_
@@ -302,13 +348,21 @@ class BaseClassifier(ABC):
             return importance_df
 
 
-    def extract_useful_features(self, n=50):
+    def extract_useful_features(self,
+                                n: int = 50
+                                ) -> pl.DataFrame:
         """
-        function to extract n useful features for successive measurements. As 
-        features are generally normalized across a range of values to estimate a baseline,
-        this function also patches these informative features so that they can be used
-        n       int     default=50  number of informative features 
-        returns         dataframe containing n features + some addition ones required for normalization
+        Extracts the top N most informative spectral features for future assay design.
+
+        This method "patches" the spectral list by ensuring that if very few 
+        features are selected for a specific excitation wavelength, neighboring 
+        wavelengths are included to maintain a stable baseline for normalization.
+
+        Args:
+            n: Number of primary informative features to target.
+
+        Returns:
+            A Polars DataFrame containing the optimized list of features.
         """
 
         # first, get the feature importances
@@ -358,6 +412,36 @@ class BaseClassifier(ABC):
 
 
 class classifier_randomForest(RandomForestClassifier, BaseClassifier):
+    """
+    A Random Forest classifier wrapper for structured spectral datasets.
+
+    This class extends Scikit-learn's RandomForestClassifier, incorporating 
+    BaseClassifier traits for integration into the preprocessing and evaluation 
+    pipeline. It uses an ensemble of decision trees to perform classification 
+    by averaging probabilistic predictions.
+
+    Args:
+        n_jobs: The number of jobs to run in parallel for both `train` and `predict_strains`. 
+            Defaults to 1. Set to -1 to use all processors.
+        n_estimators: The number of trees in the forest. Defaults to 500.
+        criterion: The function to measure the quality of a split. 
+            Supported criteria are "gini" for the Gini impurity and 
+            "entropy" or "log_loss" for the information gain.
+        max_features: The number of features to consider when looking for the 
+            best split ("sqrt", "log2", None, or an int/float).
+        max_depth: The maximum depth of the tree. If None, nodes are expanded 
+            until all leaves are pure.
+        min_samples_split: The minimum number of samples required to split 
+            an internal node. Defaults to 2.
+        min_samples_leaf: The minimum number of samples required to be at 
+            a leaf node. Defaults to 1.
+        bootstrap: Whether bootstrap samples are used when building trees. 
+            If False, the whole dataset is used to build each tree.
+
+    Attributes:
+        model_type: Set to "tree", identifying the underlying algorithm 
+            architecture for downstream interpretation tools.
+    """
     def __init__(self, 
                  n_jobs = 1, 
                  n_estimators = 500,

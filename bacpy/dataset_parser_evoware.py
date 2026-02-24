@@ -5,6 +5,7 @@ from numpy import intersect1d
 from multiprocessing import cpu_count, get_context
 from os.path import dirname
 from os import listdir
+from typing import Optional, Union
 
 # import self-written modules
 from .file_parser_evoware import read_metadata, chunk_list, parse_batch
@@ -12,12 +13,31 @@ from .file_parser_evoware import read_metadata, chunk_list, parse_batch
 
 
 # now building the wrapper function to parse a whole evoware dataset
-def parse_dataset_evoware(layout, mapping=None, n_jobs=-1, manifest_file="parsing_manifest"):
+def parse_dataset_evoware(
+                            layout: str, 
+                            mapping: Optional[str] = None, 
+                            n_jobs: int = -1, 
+                            manifest_file: str = "parsing_manifest"
+                          ) -> pl.DataFrame:
     """
-    function to parse a TECAN evoware dataset to obtain a neatly formatted dataframe (long format)
-    layout:     str     REQUIRED: path to the layout file:  **plates  <-->  hotel**
-    mapping:    str     OPTIONAL: mapping-file:             **strains <-->  wells**
-    n_jobs:     int     number of threads: defaults to -1, which means using all cores of the machine 
+    Parses a TECAN Evoware dataset into a neatly formatted long-format DataFrame.
+
+    This function iterates through dataset components using the specified layout 
+    and optional mapping files, parallelizing the parsing process across 
+    multiple CPU cores.
+
+    Args:
+        layout: Path to the layout file defining the relationship between 
+            plates and hotels. (Required)
+        mapping: Path to the mapping file defining the relationship between 
+            strains and wells. (Optional)
+        n_jobs: The number of threads/CPU cores to use for parallel processing. 
+            Defaults to -1 (uses all available cores).
+        manifest_file: The filename or path for the parsing manifest log. 
+            Defaults to "parsing_manifest".
+
+    Returns:
+        A long-format Polars DataFrame containing the integrated dataset.
     """
 
     # read the inputs
