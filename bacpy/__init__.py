@@ -22,7 +22,7 @@ from .file_parser_flowjo import parse_file_flowjo, get_column_types_flowjo
 from .dataset_parser_flowjo import parse_dataset_flowjo
 
 # taxonomy look-up
-from .taxonomy import taxonomy_dict, taxonomy_df
+from .taxonomy import taxonomy_dict, taxonomy_df, taxonomy_df2
 
 # train a model
 from .predictive_model import classifier_randomForest, classifier_extraTrees, train_test_split, classifier_xgboost, classifier_neuralnet, classifier_svm, classifier_catboost, classifier_lightgbm

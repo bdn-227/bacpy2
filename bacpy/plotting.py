@@ -21,7 +21,7 @@ from matplotlib.ticker import FuncFormatter
 from typing import Dict, Union, Optional, Tuple, List
 
 # load bacpy modules
-from .taxonomy import taxonomy_df
+from .taxonomy import taxonomy_df2
 
 
 def _generate_random_rgba_colors(n, transparent=False):
@@ -121,7 +121,7 @@ def _plot_single_cm(confusion_matrix,
         # map the taxonomic level back to taxonomy_df
         annotation_df = (confusion_matrix
                                 .select(taxonomic_level)
-                                .join(taxonomy_df.select(annotation, taxonomic_level).unique(subset=taxonomic_level, keep="first"), how="left", on = taxonomic_level)
+                                .join(taxonomy_df2.select(annotation, taxonomic_level).unique(subset=taxonomic_level, keep="first"), how="left", on = taxonomic_level)
                                 .sort(annotation))
 
         # adjust order of heatmap according to taxonomy

@@ -39,3 +39,6 @@ with pkg_resources.path("bacpy", "taxonomy.tsv") as p:
     taxonomy_df = pl.read_csv(str(p), separator="\t")
     taxonomy_df = taxonomy_df.select([tax for tax in taxonomic_levels if tax in taxonomy_df.columns]).fill_null("n.d.")
 
+with pkg_resources.path("bacpy", "taxonomy2.tsv") as p:
+    taxonomy_df2 = pl.read_csv(str(p), separator="\t")
+    taxonomy_df2 = taxonomy_df2.select([tax for tax in taxonomic_levels if tax in taxonomy_df2.columns]).fill_null("n.d.")
