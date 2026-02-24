@@ -12,7 +12,7 @@ from .file_parser_evoware import read_metadata, chunk_list, parse_batch
 
 
 # now building the wrapper function to parse a whole evoware dataset
-def parse_dataset_evoware(layout, mapping=None, n_jobs=-1, manifest_file="parsing_manitest"):
+def parse_dataset_evoware(layout, mapping=None, n_jobs=-1, manifest_file="parsing_manifest"):
     """
     function to parse a TECAN evoware dataset to obtain a neatly formatted dataframe (long format)
     layout:     str     REQUIRED: path to the layout file:  **plates  <-->  hotel**

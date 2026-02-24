@@ -8,6 +8,7 @@ from .predictive_model import train_test_split, classifier_randomForest
 from time import strftime, gmtime
 from random import shuffle
 from sklearn import clone
+from ast import literal_eval
 
 
 
@@ -105,3 +106,11 @@ def optimize_preprocess_platereader(parsed,
     if filename is not None:
         test_df.write_csv(f"{filename}.tsv", separator="\t")
     return test_df
+
+
+
+def preprocess_optimized(parsed, optimization_result):
+    kwargs = literal_eval(optimization_result["kwargs"][0])
+    kwargs["print_logs"] = True
+    rf_dat_optimized = preprocess_platereader(parsed, **kwargs)
+    return rf_dat_optimized
