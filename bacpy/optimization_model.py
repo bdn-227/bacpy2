@@ -5,7 +5,6 @@ from .predictive_model import classifier_catboost, classifier_extraTrees, classi
 from .utils import save_model
 import polars as pl
 import numpy as np
-import random
 from scipy.stats._distn_infrastructure import rv_continuous_frozen, rv_discrete_frozen
 from sklearn.model_selection import StratifiedKFold
 import importlib
@@ -82,26 +81,29 @@ param_grid_catboost = {
 
 
 
-def sample_params(param_distributions):
+def sample_params(param_distributions, seed):
     sampled = {}
     for key, val in param_distributions.items():
         if isinstance(val, list) or isinstance(val, np.ndarray):
+            import random
+            random.seed(seed)
             sampled[key] = random.choice(val)
         elif isinstance(val, rv_continuous_frozen) or isinstance(val, rv_discrete_frozen):
-            sampled[key] = int(val.rvs(1)[0])
+            sampled[key] = int(val.rvs(1, random_state=seed)[0])
         else:
             raise ValueError(f"Unknown type for {key}: {type(val)}")
     return sampled
 
 
 def optimize_model_platereader(
-                                    rf_dat: pl.DataFrame, 
-                                    on: str = "strainID", 
-                                    by: str = "f1",
-                                    cv_folds: int = 5,
-                                    parameters_per_model: int = 10,
-                                    n_jobs: int = -1,
-                                    filename: Optional[str] = None,
+                               rf_dat: pl.DataFrame, 
+                               on: str = "strainID", 
+                               by: str = "f1",
+                               cv_folds: int = 5,
+                               parameters_per_model: int = 10,
+                               n_jobs: int = -1,
+                               seed: int = 42,
+                               filename: Optional[str] = None,
                               ) -> pl.DataFrame:
     """
     Evaluates multiple classifier architectures and hyperparameter sets using cross-validation.
@@ -121,6 +123,7 @@ def optimize_model_platereader(
         parameters_per_model: The number of unique hyperparameter combinations 
             to sample and test for each model type.
         n_jobs: Number of threads used by the individual classifiers.
+        seed: seed for reproducibility
         filename: Optional path to save the full optimization results as a .tsv file.
 
     Returns:
@@ -131,22 +134,22 @@ def optimize_model_platereader(
     # define cross-validation folds
     x = rf_dat.select(pl.selectors.starts_with("wv")).to_numpy()
     y = rf_dat.select(on).to_numpy()
-    cv = StratifiedKFold(n_splits=cv_folds, shuffle=True)
+    cv = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=seed)
     folds = [(train_idx, test_idx) for train_idx, test_idx in cv.split(np.zeros(len(y)), y)]
 
     # sample hyperparameters
-    param_ls_rf = [sample_params(param_grid_rf) for _ in range(parameters_per_model)]
-    param_ls_svc = [sample_params(param_grid_svc) for _ in range(parameters_per_model)]
-    param_ls_xgb = [sample_params(param_grid_xgb) for _ in range(parameters_per_model)]
-    param_ls_nn = [sample_params(param_grid_nn) for _ in range(parameters_per_model)]
-    param_ls_lightgbm = [sample_params(param_grid_lightbgm) for _ in range(parameters_per_model)]
-    param_ls_catboost = [sample_params(param_grid_catboost) for _ in range(parameters_per_model)]
+    param_ls_rf = [sample_params(param_grid_rf, seed) for _ in range(parameters_per_model)]
+    param_ls_svc = [sample_params(param_grid_svc, seed) for _ in range(parameters_per_model)]
+    param_ls_xgb = [sample_params(param_grid_xgb, seed) for _ in range(parameters_per_model)]
+    param_ls_nn = [sample_params(param_grid_nn, seed) for _ in range(parameters_per_model)]
+    param_ls_lightgbm = [sample_params(param_grid_lightbgm, seed) for _ in range(parameters_per_model)]
+    param_ls_catboost = [sample_params(param_grid_catboost, seed) for _ in range(parameters_per_model)]
 
     model_d = {
-               #classifier_xgboost: param_ls_xgb, 
+               classifier_xgboost: param_ls_xgb, 
                classifier_randomForest: param_ls_rf, 
                classifier_extraTrees: param_ls_rf, 
-               #classifier_svm: param_ls_svc,
+               classifier_svm: param_ls_svc,
                classifier_neuralnet: param_ls_nn,
                classifier_lightgbm: param_ls_lightgbm,
                classifier_catboost: param_ls_catboost,
@@ -193,9 +196,9 @@ def optimize_model_platereader(
 
 
 def get_optimized_model(
-                            optimization_result: pl.DataFrame, 
-                            n_jobs: int = -1, 
-                            filename: Optional[str] = None
+                        optimization_result: pl.DataFrame, 
+                        n_jobs: int = -1, 
+                        filename: Optional[str] = None
                        ) -> Any:
     """
     Instantiates and optionally saves the top-performing model from an optimization report.

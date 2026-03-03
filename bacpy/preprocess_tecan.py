@@ -116,7 +116,7 @@ def preprocess_platereader(
                             add_od: bool = False,
                             outlier_threshold: Union[bool, int] = False,
                             outlier_column: str = "strainID",
-                            multicore: bool = True,
+                            multicore: Union[bool, int] = True,
                             print_logs: bool = True,
                             return_after: Union[bool, str] = False,
                           ) -> pl.DataFrame:
@@ -163,6 +163,9 @@ def preprocess_platereader(
     if not multicore:
         import os
         os.environ["POLARS_MAX_THREADS"] = "1"
+    elif isinstance(multicore, int):
+        import os
+        os.environ["POLARS_MAX_THREADS"] = str(multicore)
     from sklearn.decomposition import PCA
     from scipy.stats import zscore
     import warnings
